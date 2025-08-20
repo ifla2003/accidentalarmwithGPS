@@ -1,0 +1,11 @@
+#history data
+.lh/
+
+#environment data
+.env
+
+node_modules/
+build/
+
+#uploads
+uploads/
