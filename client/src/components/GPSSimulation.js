@@ -283,65 +283,7 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
     alert(distanceInfo);
   };
 
-  const simulateCustomDistance = (targetDistance) => {
-    if (vehicles.length >= 2) {
-      const baseLocation = {
-        latitude: 40.7128,
-        longitude: -74.006,
-      };
 
-      console.log(`=== Testing ${targetDistance}m distance ===`);
-      console.log(`Base location: ${baseLocation.latitude}, ${baseLocation.longitude}`);
-
-      // Place first vehicle at base with high precision
-      const firstLocation = {
-        phoneNumber: vehicles[0].phoneNumber,
-        latitude: parseFloat(baseLocation.latitude.toFixed(8)),
-        longitude: parseFloat(baseLocation.longitude.toFixed(8)),
-        accuracy: 5,
-      };
-      
-      console.log(`First vehicle location: ${firstLocation.latitude}, ${firstLocation.longitude}`);
-      onLocationUpdate(firstLocation);
-
-      // Place second vehicle at exact target distance with high precision
-      if (vehicles.length >= 2) {
-        // Use a simple approach: move targetDistance meters north
-        const metersPerDegreeLat = 111320;
-        const latOffset = targetDistance / metersPerDegreeLat;
-        
-        const secondLocation = {
-          phoneNumber: vehicles[1].phoneNumber,
-          latitude: parseFloat((baseLocation.latitude + latOffset).toFixed(8)),
-          longitude: parseFloat(baseLocation.longitude.toFixed(8)),
-          accuracy: 5,
-        };
-        
-        console.log(`Lat offset: ${latOffset.toFixed(10)}`);
-        console.log(`Second vehicle location: ${secondLocation.latitude}, ${secondLocation.longitude}`);
-        
-        onLocationUpdate(secondLocation);
-
-        // Calculate expected distance to verify
-        setTimeout(() => {
-          const R = 6371000;
-          const dLat = ((secondLocation.latitude - firstLocation.latitude) * Math.PI) / 180;
-          const dLon = ((secondLocation.longitude - firstLocation.longitude) * Math.PI) / 180;
-          const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos((firstLocation.latitude * Math.PI) / 180) *
-              Math.cos((secondLocation.latitude * Math.PI) / 180) *
-              Math.sin(dLon / 2) *
-              Math.sin(dLon / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          const calculatedDistance = R * c;
-          
-          console.log(`Expected distance: ${targetDistance}m, Calculated: ${calculatedDistance.toFixed(1)}m`);
-          console.log(`Coordinate difference: lat=${(secondLocation.latitude - firstLocation.latitude).toFixed(10)}, lon=${(secondLocation.longitude - firstLocation.longitude).toFixed(10)}`);
-        }, 100);
-      }
-    }
-  };
 
   // Add a test function with obvious large distance
   const testLargeDistance = () => {
@@ -433,26 +375,7 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
           </button>
         </div>
 
-        <div className="control-row">
-          <button
-            className="control-btn warning"
-            onClick={() => simulateCustomDistance(1.0)}
-          >
-            Test 1.0m Distance
-          </button>
-          <button
-            className="control-btn warning"
-            onClick={() => simulateCustomDistance(3.0)}
-          >
-            Test 3.0m Distance
-          </button>
-          <button
-            className="control-btn"
-            onClick={() => simulateCustomDistance(5.0)}
-          >
-            Test 5.0m Distance
-          </button>
-        </div>
+
 
         <div className="control-row">
           <button
