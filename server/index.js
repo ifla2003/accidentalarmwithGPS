@@ -97,6 +97,8 @@ io.on("connection", (socket) => {
   socket.on("location-update", async (data) => {
     const { phoneNumber, latitude, longitude } = data;
 
+    console.log(`Location update received: ${phoneNumber} -> ${latitude}, ${longitude}`);
+
     try {
       // Update vehicle location
       const vehicle = await Vehicle.findOneAndUpdate(
@@ -108,6 +110,8 @@ io.on("connection", (socket) => {
       );
 
       if (vehicle) {
+        console.log(`Vehicle ${vehicle.vehicleId} updated in DB: ${vehicle.currentLocation.latitude}, ${vehicle.currentLocation.longitude}`);
+        
         // Check for nearby vehicles
         await checkCollisionRisk(vehicle, io);
 
@@ -152,6 +156,11 @@ async function checkCollisionRisk(currentVehicle, io) {
           }
         );
 
+        // Log coordinates and distance calculation for debugging
+        console.log(`Vehicle ${currentVehicle.vehicleId} at: ${currentVehicle.currentLocation.latitude}, ${currentVehicle.currentLocation.longitude}`);
+        console.log(`Vehicle ${otherVehicle.vehicleId} at: ${otherVehicle.currentLocation.latitude}, ${otherVehicle.currentLocation.longitude}`);
+        console.log(`Distance between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}: ${distance} meters`);
+        
         // Convert distance from meters to check threshold
         if (distance <= DANGER_DISTANCE) {
           const alertData = {
@@ -168,6 +177,8 @@ async function checkCollisionRisk(currentVehicle, io) {
             timestamp: new Date(),
           };
 
+          console.log(`COLLISION ALERT: ${distance} meters between vehicles`);
+          
           // Send alert to all clients (broadcast collision warning)
           io.emit("collision-alert", alertData);
         }
