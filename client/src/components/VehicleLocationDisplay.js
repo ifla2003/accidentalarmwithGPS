@@ -41,7 +41,9 @@ const VehicleLocationDisplay = ({ vehicles }) => {
   };
 
   const formatLocation = (location) => {
-    if (!location) return 'No GPS Data';
+    if (!location || location.latitude === undefined || location.longitude === undefined) {
+      return 'No GPS Data';
+    }
     return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
   };
 
