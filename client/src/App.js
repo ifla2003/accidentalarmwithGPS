@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import CollisionAlert from './components/CollisionAlert';
 import Dashboard from './components/Dashboard';
-import MapDemo from './components/MapDemo';
 import './App.css';
 
 const socket = io('http://localhost:5000');
@@ -10,7 +9,6 @@ const socket = io('http://localhost:5000');
 function App() {
   const [vehicles, setVehicles] = useState([]);
   const [collisionAlert, setCollisionAlert] = useState(null);
-  const [demoMode, setDemoMode] = useState(false);
   const [systemStatus, setSystemStatus] = useState({
     monitoring: 'Active',
     lastUpdate: new Date().toLocaleTimeString(),
@@ -86,56 +84,12 @@ function App() {
     setCollisionAlert(null);
   };
 
-  if (demoMode) {
-    return (
-      <div className="App">
-        <header className="App-header">
-          <span className="header-icon">🗺️</span>
-          <h1>Vehicle Map Demo</h1>
-          <p>Interactive OpenStreetMap with vehicle tracking</p>
-          <button 
-            onClick={() => setDemoMode(false)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#0984e3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              marginTop: '10px'
-            }}
-          >
-            ← Back to Main App
-          </button>
-        </header>
-        
-        <main className="App-main">
-          <MapDemo />
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="App">
       <header className="App-header">
         <span className="header-icon">🚗</span>
         <h1>Vehicle Collision Warning System</h1>
         <p>GPS-based proximity alarm for accident prevention</p>
-        {/* <button 
-          onClick={() => setDemoMode(true)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#00b894',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            marginTop: '10px'
-          }}
-        >
-          🗺️ View Map Demo
-        </button> */}
       </header>
       
       <main className="App-main">

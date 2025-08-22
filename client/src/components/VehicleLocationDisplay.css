@@ -1,0 +1,276 @@
+.vehicle-location-display {
+  min-height: 400px;
+}
+
+.no-vehicles {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.locations-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.location-card {
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  background: #f9f9f9;
+  transition: all 0.3s ease;
+}
+
+.location-card.safe {
+  border-color: #4caf50;
+  background: #f1f8e9;
+}
+
+.location-card.warning {
+  border-color: #ff9800;
+  background: #fff3e0;
+}
+
+.location-card.collision {
+  border-color: #f44336;
+  background: #ffebee;
+  animation: pulse-danger 2s infinite;
+}
+
+.location-card.no-gps {
+  border-color: #9e9e9e;
+  background: #f5f5f5;
+}
+
+@keyframes pulse-danger {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
+  }
+}
+
+.vehicle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+.vehicle-id {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.status-badge.safe {
+  background: #4caf50;
+  color: white;
+}
+
+.status-badge.warning {
+  background: #ff9800;
+  color: white;
+}
+
+.status-badge.collision {
+  background: #f44336;
+  color: white;
+  animation: blink-badge 1s infinite;
+}
+
+.status-badge.no-gps {
+  background: #9e9e9e;
+  color: white;
+}
+
+@keyframes blink-badge {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.5; }
+}
+
+.location-details {
+  margin-bottom: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 2px 0;
+}
+
+.label {
+  font-weight: 500;
+  color: #555;
+  flex: 1;
+}
+
+.value {
+  color: #333;
+  font-family: monospace;
+  text-align: right;
+  flex: 1;
+}
+
+.location-coords {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.proximity-info {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ddd;
+}
+
+.proximity-info h5 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #555;
+}
+
+.distances {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.distance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.other-vehicle {
+  font-size: 12px;
+  color: #666;
+}
+
+.distance {
+  font-weight: bold;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.distance.safe {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.distance.warning {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.distance.danger {
+  background: #ffebee;
+  color: #c62828;
+  animation: pulse-text 1s infinite;
+}
+
+@keyframes pulse-text {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.legend {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 2px solid #e0e0e0;
+}
+
+.legend h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-dot.safe {
+  background: #4caf50;
+}
+
+.legend-dot.warning {
+  background: #ff9800;
+}
+
+.legend-dot.collision {
+  background: #f44336;
+}
+
+.legend-dot.no-gps {
+  background: #9e9e9e;
+}
+
+/* Scrollbar styling for locations grid */
+.locations-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.locations-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.locations-grid::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.locations-grid::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .legend-items {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .detail-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .value {
+    text-align: left;
+  }
+}

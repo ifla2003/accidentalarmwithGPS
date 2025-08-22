@@ -3,7 +3,8 @@ import VehicleRegistration from "./VehicleRegistration";
 import RegisteredVehicles from "./RegisteredVehicles";
 import GPSSimulation from "./GPSSimulation";
 import SystemStatus from "./SystemStatus";
-import VehicleMap from "./VehicleMap";
+import LocationTracker from "./LocationTracker";
+import VehicleLocationDisplay from "./VehicleLocationDisplay";
 import "./Dashboard.css";
 
 const Dashboard = ({
@@ -13,6 +14,11 @@ const Dashboard = ({
   onRemoveVehicle,
   onLocationUpdate,
 }) => {
+  const handleTrackingChange = (isTracking) => {
+    // Handle tracking state change if needed
+    console.log('GPS Tracking:', isTracking ? 'Started' : 'Stopped');
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-row">
@@ -29,7 +35,15 @@ const Dashboard = ({
 
       <div className="dashboard-row">
         <SystemStatus status={systemStatus} />
-        <VehicleMap vehicles={vehicles} />
+        <LocationTracker 
+          vehicles={vehicles}
+          onLocationUpdate={onLocationUpdate}
+          onTrackingChange={handleTrackingChange}
+        />
+      </div>
+
+      <div className="dashboard-row">
+        <VehicleLocationDisplay vehicles={vehicles} />
       </div>
     </div>
   );

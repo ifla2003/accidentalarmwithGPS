@@ -24,47 +24,71 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
     setSimulationData({});
   };
 
-  const startGPSTracking = (vehicle) => {
-    if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const locationData = {
-            phoneNumber: vehicle.phoneNumber,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          };
-          onLocationUpdate(locationData);
-        },
-        (error) => {
-          console.error("GPS Error:", error);
-          let errorMessage = "GPS Error: ";
-          switch(error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage += "Location access denied. Please enable GPS and grant location permissions.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage += "Location information unavailable. Please check your GPS settings.";
-              break;
-            case error.TIMEOUT:
-              errorMessage += "Location request timed out. Please try again.";
-              break;
-            default:
-              errorMessage += "Unknown GPS error occurred.";
-              break;
-          }
-          alert(errorMessage);
-        },
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-      );
-
-      setSimulationData((prev) => ({
-        ...prev,
-        [vehicle.phoneNumber]: { watchId },
-      }));
-    } else {
+  const startGPSTracking = async (vehicle) => {
+    if (!navigator.geolocation) {
       alert("GPS not supported on this device/browser. Use simulation buttons instead.");
+      return;
     }
+
+    try {
+      // Check permission status first
+      const permission = await navigator.permissions.query({ name: 'geolocation' });
+      
+      if (permission.state === 'denied') {
+        alert("❌ GPS Permission Denied!\n\nTo enable GPS tracking:\n1. Click the location icon in your browser's address bar\n2. Select 'Allow' for location access\n3. Reload the page and try again\n\nAlternatively, use the simulation buttons below for testing.");
+        return;
+      }
+    } catch (err) {
+      // Permission API not supported, continue with geolocation attempt
+      console.log('Permission API not supported, trying direct GPS access');
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const locationData = {
+          phoneNumber: vehicle.phoneNumber,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+        onLocationUpdate(locationData);
+      },
+      (error) => {
+        console.error("GPS Error:", error);
+        let errorMessage = "GPS Error: ";
+        let instructions = "";
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "Location access denied.";
+            instructions = "\n\n🔧 How to fix:\n1. Click the location/lock icon in your browser address bar\n2. Change location permission to 'Allow'\n3. Reload the page\n4. Try again\n\n💡 Or use simulation buttons for testing!";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "GPS location unavailable.";
+            instructions = "\n\n🔧 How to fix:\n1. Check if GPS is enabled on your device\n2. Try moving to an area with better GPS signal\n3. Use simulation buttons for indoor testing";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "GPS request timed out.";
+            instructions = "\n\n🔧 Try:\n1. Check your GPS signal\n2. Try again in a few seconds\n3. Use simulation buttons for testing";
+            break;
+          default:
+            errorMessage += "Unknown GPS error occurred.";
+            instructions = "\n\n💡 Use simulation buttons for testing!";
+            break;
+        }
+        alert(errorMessage + instructions);
+      },
+      { 
+        enableHighAccuracy: true, 
+        maximumAge: 1000, 
+        timeout: 15000  // Increased timeout
+      }
+    );
+
+    setSimulationData((prev) => ({
+      ...prev,
+      [vehicle.phoneNumber]: { watchId },
+    }));
   };
 
   const simulateNearCollision = () => {
@@ -268,6 +292,13 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
   return (
     <div className="dashboard-panel">
       <h3>GPS Simulation</h3>
+      
+      <div className="gps-help-info">
+        <div className="help-item">
+          <strong>🔧 GPS Permission Issues?</strong>
+          <p>If GPS is denied: Click the 🔒 or 📍 icon in your browser's address bar → Allow location → Reload page</p>
+        </div>
+      </div>
 
       <div className="simulation-controls">
         <div className="control-row">

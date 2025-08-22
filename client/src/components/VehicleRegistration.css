@@ -4,14 +4,65 @@
   gap: 10px;
 }
 
-.registration-form input {
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.phone-input-container {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  overflow: hidden;
+  transition: border-color 0.3s ease;
+}
+
+.phone-input-container:focus-within {
+  border-color: #6c5ce7;
+}
+
+.country-code {
+  background-color: #f8f9fa;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #333;
+  border-right: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.phone-input-container input {
+  border: none;
+  padding: 10px;
+  font-size: 14px;
+  flex: 1;
+  background: transparent;
+}
+
+.phone-input-container input:focus {
+  outline: none;
+}
+
+.phone-input-container input.error {
+  background-color: #fff5f5;
+}
+
+.error-message {
+  color: #e53e3e;
+  font-size: 12px;
+  margin-top: 2px;
+  padding-left: 5px;
+}
+
+.registration-form input:not(.phone-input-container input) {
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 5px;
   font-size: 14px;
 }
 
-.registration-form input:focus {
+.registration-form input:not(.phone-input-container input):focus {
   outline: none;
   border-color: #6c5ce7;
 }
