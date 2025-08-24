@@ -1,35 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useRef, useEffect, useState } from 'react';
 import './VehicleMap.css';
-
-// Fix Leaflet default marker icons
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-// Custom vehicle icons
-const createVehicleIcon = (status, vehicleId) => {
-  let color = '#00b894'; // Green for safe
-  if (status === 'warning') color = '#fdcb6e'; // Yellow
-  if (status === 'collision') color = '#e17055'; // Red
-  if (status === 'no-gps') color = '#95a5a6'; // Gray
-
-  return L.divIcon({
-    className: 'custom-vehicle-marker',
-    html: `
-      <div class="vehicle-marker-icon ${status}" style="background-color: ${color};">
-        <span class="vehicle-id">${vehicleId.slice(-1)}</span>
-      </div>
-    `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-  });
-};
 
 const calculateRealDistance = (vehicle1, vehicle2) => {
   if (!vehicle1.currentLocation || !vehicle2.currentLocation) return Infinity;
@@ -50,150 +20,297 @@ const calculateRealDistance = (vehicle1, vehicle2) => {
   return R * c; // Distance in meters
 };
 
-// Component to auto-fit map bounds to show all vehicles
-const MapBounds = ({ vehicles }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (vehicles.length > 0) {
-      const validVehicles = vehicles.filter(v => 
-        v.currentLocation && v.currentLocation.latitude && v.currentLocation.longitude
-      );
-      
-      if (validVehicles.length > 0) {
-        const bounds = L.latLngBounds(
-          validVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
-        );
-        map.fitBounds(bounds, { padding: [20, 20] });
-      }
-    }
-  }, [vehicles, map]);
-  
-  return null;
-};
-
 const VehicleMap = ({ vehicles }) => {
-  // Default center (NYC) if no vehicles
-  const defaultCenter = [40.7128, -74.0060];
-  
-  // Get center from first vehicle with location or use default
-  const mapCenter = vehicles.find(v => v.currentLocation?.latitude && v.currentLocation?.longitude)
-    ? [vehicles.find(v => v.currentLocation?.latitude && v.currentLocation?.longitude).currentLocation.latitude,
-       vehicles.find(v => v.currentLocation?.latitude && v.currentLocation?.longitude).currentLocation.longitude]
-    : defaultCenter;
+  const canvasRef = useRef(null);
+  const [hoveredVehicle, setHoveredVehicle] = useState(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const renderVehicleMarkers = () => {
-    const markers = [];
+  const getVehicleStatus = (vehicle) => {
+    if (!vehicle.currentLocation || !vehicle.currentLocation.latitude || !vehicle.currentLocation.longitude) {
+      return { status: 'no-gps', minDistance: null };
+    }
+
+    let status = 'safe';
+    let minDistance = Infinity;
     
-    vehicles.forEach((vehicle) => {
-      // Skip vehicles without location data
-      if (!vehicle.currentLocation || !vehicle.currentLocation.latitude || !vehicle.currentLocation.longitude) {
-        return;
-      }
-
-      // Determine status based on real distance to other vehicles
-      let status = 'safe';
-      let minDistance = Infinity;
-      
-      vehicles.forEach((otherVehicle) => {
-        if (otherVehicle.phoneNumber !== vehicle.phoneNumber) {
-          const distance = calculateRealDistance(vehicle, otherVehicle);
-          if (distance < minDistance) {
-            minDistance = distance;
-          }
-          
-          if (distance <= 3) { // 3 meter - collision risk
-            status = 'collision';
-          } else if (distance <= 5 && status !== 'collision') { // 5 meters - warning zone
-            status = 'warning';
-          }
+    vehicles.forEach((otherVehicle) => {
+      if (otherVehicle.phoneNumber !== vehicle.phoneNumber) {
+        const distance = calculateRealDistance(vehicle, otherVehicle);
+        if (distance < minDistance) {
+          minDistance = distance;
         }
-      });
-      
-      const position = [vehicle.currentLocation.latitude, vehicle.currentLocation.longitude];
-      const icon = createVehicleIcon(status, vehicle.vehicleId);
-      
-      // Add warning/collision radius circles
-      if (status === 'warning' || status === 'collision') {
-        markers.push(
-          <Circle
-            key={`${vehicle.phoneNumber}-radius`}
-            center={position}
-            radius={status === 'collision' ? 3 : 5}
-            pathOptions={{
-              color: status === 'collision' ? '#e17055' : '#fdcb6e',
-              fillColor: status === 'collision' ? '#e17055' : '#fdcb6e',
-              fillOpacity: 0.1,
-              weight: 2,
-            }}
-          />
-        );
+        
+        if (distance <= 3) { // 3 meter - collision risk
+          status = 'collision';
+        } else if (distance <= 5 && status !== 'collision') { // 5 meters - warning zone
+          status = 'warning';
+        }
       }
-      
-      markers.push(
-        <Marker
-          key={vehicle.phoneNumber}
-          position={position}
-          icon={icon}
-        >
-          <Popup>
-            <div className="vehicle-popup">
-              <h4>🚗 {vehicle.vehicleId}</h4>
-              <p><strong>Phone:</strong> {vehicle.phoneNumber}</p>
-              <p><strong>Status:</strong> <span className={`status-${status}`}>{status.toUpperCase()}</span></p>
-              <p><strong>GPS:</strong> {vehicle.currentLocation.latitude.toFixed(6)}, {vehicle.currentLocation.longitude.toFixed(6)}</p>
-              <p><strong>Accuracy:</strong> ±{vehicle.currentLocation.accuracy || 'N/A'}m</p>
-              <p><strong>Nearest Vehicle:</strong> {minDistance === Infinity ? 'N/A' : `${minDistance.toFixed(1)}m`}</p>
-              <p><strong>Last Update:</strong> {new Date(vehicle.lastUpdate || vehicle.currentLocation.timestamp).toLocaleTimeString()}</p>
-            </div>
-          </Popup>
-        </Marker>
-      );
     });
     
-    return markers;
+    return { status, minDistance: minDistance === Infinity ? null : minDistance };
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'collision': return '#e74c3c'; // Red
+      case 'warning': return '#f39c12'; // Orange/Yellow
+      case 'safe': return '#27ae60'; // Green
+      case 'no-gps': return '#95a5a6'; // Gray
+      default: return '#95a5a6';
+    }
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    
+    // Set canvas size
+    canvas.width = rect.width * window.devicePixelRatio;
+    canvas.height = rect.height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    // Clear canvas
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    // Get vehicles with valid locations
+    const validVehicles = vehicles.filter(v => 
+      v.currentLocation && v.currentLocation.latitude && v.currentLocation.longitude
+    );
+
+    if (validVehicles.length === 0) {
+      // Draw "No vehicles" message
+      ctx.fillStyle = '#6c757d';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('No vehicles with GPS data', rect.width / 2, rect.height / 2);
+      return;
+    }
+
+    // Calculate bounds
+    const lats = validVehicles.map(v => v.currentLocation.latitude);
+    const lngs = validVehicles.map(v => v.currentLocation.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    // Add padding to bounds
+    const latRange = maxLat - minLat || 0.001;
+    const lngRange = maxLng - minLng || 0.001;
+    const padding = 0.2;
+    
+    const paddedMinLat = minLat - latRange * padding;
+    const paddedMaxLat = maxLat + latRange * padding;
+    const paddedMinLng = minLng - lngRange * padding;
+    const paddedMaxLng = maxLng + lngRange * padding;
+
+    // Convert GPS coordinates to canvas coordinates
+    const gpsToCanvas = (lat, lng) => {
+      const x = ((lng - paddedMinLng) / (paddedMaxLng - paddedMinLng)) * (rect.width - 40) + 20;
+      const y = ((paddedMaxLat - lat) / (paddedMaxLat - paddedMinLat)) * (rect.height - 40) + 20;
+      return { x, y };
+    };
+
+    // Draw vehicles
+    validVehicles.forEach((vehicle) => {
+      const { status } = getVehicleStatus(vehicle);
+      const { x, y } = gpsToCanvas(vehicle.currentLocation.latitude, vehicle.currentLocation.longitude);
+      
+      // Draw vehicle dot
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, 2 * Math.PI);
+      ctx.fillStyle = getStatusColor(status);
+      ctx.fill();
+      
+      // Draw border
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw vehicle ID
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(vehicle.vehicleId.slice(-1), x, y + 3);
+    });
+
+  }, [vehicles]);
+
+  const handleMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    setMousePos({ x: e.clientX, y: e.clientY });
+
+    // Check if mouse is over a vehicle
+    const validVehicles = vehicles.filter(v => 
+      v.currentLocation && v.currentLocation.latitude && v.currentLocation.longitude
+    );
+
+    if (validVehicles.length === 0) {
+      setHoveredVehicle(null);
+      return;
+    }
+
+    // Calculate bounds (same as in useEffect)
+    const lats = validVehicles.map(v => v.currentLocation.latitude);
+    const lngs = validVehicles.map(v => v.currentLocation.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    const latRange = maxLat - minLat || 0.001;
+    const lngRange = maxLng - minLng || 0.001;
+    const padding = 0.2;
+    
+    const paddedMinLat = minLat - latRange * padding;
+    const paddedMaxLat = maxLat + latRange * padding;
+    const paddedMinLng = minLng - lngRange * padding;
+    const paddedMaxLng = maxLng + lngRange * padding;
+
+    const gpsToCanvas = (lat, lng) => {
+      const x = ((lng - paddedMinLng) / (paddedMaxLng - paddedMinLng)) * (rect.width - 40) + 20;
+      const y = ((paddedMaxLat - lat) / (paddedMaxLat - paddedMinLat)) * (rect.height - 40) + 20;
+      return { x, y };
+    };
+
+    let foundVehicle = null;
+    validVehicles.forEach((vehicle) => {
+      const { x, y } = gpsToCanvas(vehicle.currentLocation.latitude, vehicle.currentLocation.longitude);
+      const distance = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+      
+      if (distance <= 12) { // 12px radius for hover detection
+        foundVehicle = vehicle;
+      }
+    });
+
+    setHoveredVehicle(foundVehicle);
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredVehicle(null);
   };
 
   return (
-    <div className="dashboard-panel vehicle-map-panel">
-      <h3>🗺️ Vehicle Positions - Live Map</h3>
-      <div className="map-container">
-        <div className="leaflet-map-wrapper">
-          <MapContainer
-            center={mapCenter}
-            zoom={15}
-            style={{ height: '400px', width: '100%' }}
-            className="vehicle-leaflet-map"
-            zoomControl={true}
-            scrollWheelZoom={true}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapBounds vehicles={vehicles} />
-            {renderVehicleMarkers()}
-          </MapContainer>
-        </div>
+    <div className="dashboard-panel vehicle-positions-panel">
+      <h3>Vehicle Positions</h3>
+      <div className="visual-map-container">
+        <canvas
+          ref={canvasRef}
+          className="vehicle-canvas"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        />
         
-        <div className="map-legend">
+        {hoveredVehicle && (
+          <div 
+            className="vehicle-tooltip"
+            style={{
+              left: mousePos.x + 10,
+              top: mousePos.y - 10,
+            }}
+          >
+            <div className="tooltip-content">
+              <h4>🚗 {hoveredVehicle.vehicleId}</h4>
+              <p><strong>Phone:</strong> {hoveredVehicle.phoneNumber}</p>
+              <p><strong>Status:</strong> {getVehicleStatus(hoveredVehicle).status.toUpperCase()}</p>
+              <p><strong>GPS:</strong> {hoveredVehicle.currentLocation.latitude.toFixed(6)}, {hoveredVehicle.currentLocation.longitude.toFixed(6)}</p>
+              {getVehicleStatus(hoveredVehicle).minDistance && (
+                <p><strong>Nearest:</strong> {getVehicleStatus(hoveredVehicle).minDistance.toFixed(1)}m</p>
+              )}
+            </div>
+          </div>
+        )}
+        
+        <div className="visual-map-legend">
           <div className="legend-item">
             <div className="legend-dot safe"></div>
-            <span>Safe Distance (&gt;5m)</span>
+            <span>Safe Distance</span>
           </div>
           <div className="legend-item">
             <div className="legend-dot warning"></div>
-            <span>Warning Zone (3-5m)</span>
+            <span>Warning Zone</span>
           </div>
           <div className="legend-item">
             <div className="legend-dot collision"></div>
-            <span>Collision Risk (&lt;3m)</span>
+            <span>Collision Risk</span>
           </div>
         </div>
-        
-        <div className="map-info">
-          <p>📍 Showing {vehicles.filter(v => v.currentLocation?.latitude).length} of {vehicles.length} vehicles with GPS data</p>
-          <p>🌍 Using OpenStreetMap - Click markers for details</p>
+
+        <div className="vehicle-locations-list">
+          <h4>Current Vehicle Locations</h4>
+          {vehicles.length === 0 ? (
+            <p className="no-vehicles-message">No vehicles registered yet.</p>
+          ) : (
+            <div className="locations-grid">
+              {vehicles.map((vehicle) => {
+                const { status, minDistance } = getVehicleStatus(vehicle);
+                return (
+                  <div key={vehicle.phoneNumber} className={`location-card ${status}`}>
+                    <div className="location-header">
+                      <div 
+                        className="status-dot" 
+                        style={{ backgroundColor: getStatusColor(status) }}
+                      ></div>
+                      <div className="vehicle-details">
+                        <h5>{vehicle.vehicleId}</h5>
+                        <span className="phone-number">{vehicle.phoneNumber}</span>
+                      </div>
+                      <div className={`status-badge ${status}`}>
+                        {status.toUpperCase()}
+                      </div>
+                    </div>
+                    
+                    {vehicle.currentLocation && vehicle.currentLocation.latitude ? (
+                      <div className="location-info">
+                        <div className="coordinate-row">
+                          <span className="label">Latitude:</span>
+                          <span className="coordinate">{vehicle.currentLocation.latitude.toFixed(6)}</span>
+                        </div>
+                        <div className="coordinate-row">
+                          <span className="label">Longitude:</span>
+                          <span className="coordinate">{vehicle.currentLocation.longitude.toFixed(6)}</span>
+                        </div>
+                        <div className="coordinate-row">
+                          <span className="label">Accuracy:</span>
+                          <span className="value">±{vehicle.currentLocation.accuracy || 'N/A'}m</span>
+                        </div>
+                        {minDistance && (
+                          <div className="coordinate-row">
+                            <span className="label">Nearest Vehicle:</span>
+                            <span className="value">{minDistance.toFixed(1)}m</span>
+                          </div>
+                        )}
+                        <div className="coordinate-row">
+                          <span className="label">Last Update:</span>
+                          <span className="value">
+                            {new Date(vehicle.lastUpdate || vehicle.currentLocation.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="no-location">
+                        <p>📍 No GPS data available</p>
+                        <p>Start monitoring to get location</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

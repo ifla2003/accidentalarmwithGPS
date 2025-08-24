@@ -169,31 +169,7 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
     }
   };
 
-  const resetPositions = () => {
-    if (vehicles.length === 0) return;
 
-    // Use first vehicle's current location as base, or default if no location
-    const firstVehicle = vehicles[0];
-    const baseLocation = firstVehicle.currentLocation
-      ? {
-          latitude: firstVehicle.currentLocation.latitude,
-          longitude: firstVehicle.currentLocation.longitude,
-        }
-      : {
-          latitude: 40.7128,
-          longitude: -74.006,
-        };
-
-    vehicles.forEach((vehicle, index) => {
-      const locationData = {
-        phoneNumber: vehicle.phoneNumber,
-        latitude: baseLocation.latitude + index * 0.001, // Spread out from base
-        longitude: baseLocation.longitude + index * 0.001,
-        accuracy: 5,
-      };
-      onLocationUpdate(locationData);
-    });
-  };
 
   const assignRandomPositions = () => {
     if (vehicles.length === 0) {
@@ -283,123 +259,9 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
     alert(distanceInfo);
   };
 
-  const simulateCustomDistance = (targetDistance) => {
-    if (vehicles.length >= 2) {
-      const baseLocation = {
-        latitude: 40.7128,
-        longitude: -74.006,
-      };
 
-      console.log(`=== Testing ${targetDistance}m distance ===`);
-      console.log(`Base location: ${baseLocation.latitude}, ${baseLocation.longitude}`);
 
-      // Place first vehicle at base with high precision
-      const firstLocation = {
-        phoneNumber: vehicles[0].phoneNumber,
-        latitude: parseFloat(baseLocation.latitude.toFixed(8)),
-        longitude: parseFloat(baseLocation.longitude.toFixed(8)),
-        accuracy: 5,
-      };
-      
-      console.log(`First vehicle location: ${firstLocation.latitude}, ${firstLocation.longitude}`);
-      onLocationUpdate(firstLocation);
 
-      // Place second vehicle at exact target distance with high precision
-      if (vehicles.length >= 2) {
-        // Use a simple approach: move targetDistance meters north
-        const metersPerDegreeLat = 111320;
-        const latOffset = targetDistance / metersPerDegreeLat;
-        
-        const secondLocation = {
-          phoneNumber: vehicles[1].phoneNumber,
-          latitude: parseFloat((baseLocation.latitude + latOffset).toFixed(8)),
-          longitude: parseFloat(baseLocation.longitude.toFixed(8)),
-          accuracy: 5,
-        };
-        
-        console.log(`Lat offset: ${latOffset.toFixed(10)}`);
-        console.log(`Second vehicle location: ${secondLocation.latitude}, ${secondLocation.longitude}`);
-        
-        onLocationUpdate(secondLocation);
-
-        // Calculate expected distance to verify
-        setTimeout(() => {
-          const R = 6371000;
-          const dLat = ((secondLocation.latitude - firstLocation.latitude) * Math.PI) / 180;
-          const dLon = ((secondLocation.longitude - firstLocation.longitude) * Math.PI) / 180;
-          const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos((firstLocation.latitude * Math.PI) / 180) *
-              Math.cos((secondLocation.latitude * Math.PI) / 180) *
-              Math.sin(dLon / 2) *
-              Math.sin(dLon / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          const calculatedDistance = R * c;
-          
-          console.log(`Expected distance: ${targetDistance}m, Calculated: ${calculatedDistance.toFixed(1)}m`);
-          console.log(`Coordinate difference: lat=${(secondLocation.latitude - firstLocation.latitude).toFixed(10)}, lon=${(secondLocation.longitude - firstLocation.longitude).toFixed(10)}`);
-        }, 100);
-      }
-    }
-  };
-
-  // Add a test function with obvious large distance
-  const testLargeDistance = () => {
-    if (vehicles.length >= 2) {
-      console.log("=== Testing obvious different coordinates ===");
-      
-      // Use completely different coordinates that should definitely show distance
-      onLocationUpdate({
-        phoneNumber: vehicles[0].phoneNumber,
-        latitude: 40.7128,
-        longitude: -74.0060,
-        accuracy: 5,
-      });
-
-      // Second vehicle 0.001 degrees away (about 100+ meters)
-      onLocationUpdate({
-        phoneNumber: vehicles[1].phoneNumber,
-        latitude: 40.7138,
-        longitude: -74.0070,
-        accuracy: 5,
-      });
-      
-      console.log("Vehicle 1: 40.7128, -74.0060");
-      console.log("Vehicle 2: 40.7138, -74.0070");
-      console.log("These coordinates should show ~100+ meters distance");
-    }
-  };
-
-  // Simple 2.5m test with fixed coordinates
-  const testFixed2Point5Meters = () => {
-    if (vehicles.length >= 2) {
-      console.log("=== Testing fixed 2.5m coordinates ===");
-      
-      // Use pre-calculated coordinates that are exactly 2.5m apart
-      const lat1 = 40.712800;
-      const lon1 = -74.006000;
-      const lat2 = 40.712822; // ~2.5m north
-      const lon2 = -74.006000;
-      
-      onLocationUpdate({
-        phoneNumber: vehicles[0].phoneNumber,
-        latitude: lat1,
-        longitude: lon1,
-        accuracy: 5,
-      });
-
-      onLocationUpdate({
-        phoneNumber: vehicles[1].phoneNumber,
-        latitude: lat2,
-        longitude: lon2,
-        accuracy: 5,
-      });
-      
-      console.log(`Vehicle 1: ${lat1}, ${lon1}`);
-      console.log(`Vehicle 2: ${lat2}, ${lon2}`);
-      console.log("These should be ~2.5 meters apart");
-    }
-  };
 
   return (
     <div className="dashboard-panel">
@@ -433,47 +295,9 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
           </button>
         </div>
 
-        <div className="control-row">
-          <button
-            className="control-btn warning"
-            onClick={() => simulateCustomDistance(1.0)}
-          >
-            Test 1.0m Distance
-          </button>
-          <button
-            className="control-btn warning"
-            onClick={() => simulateCustomDistance(3.0)}
-          >
-            Test 3.0m Distance
-          </button>
-          <button
-            className="control-btn"
-            onClick={() => simulateCustomDistance(5.0)}
-          >
-            Test 5.0m Distance
-          </button>
-        </div>
 
-        <div className="control-row">
-          <button
-            className="control-btn info"
-            onClick={testLargeDistance}
-          >
-            Test 100m (Debug)
-          </button>
-          <button
-            className="control-btn info"
-            onClick={testFixed2Point5Meters}
-          >
-            Test Fixed 2.5m
-          </button>
-        </div>
 
-        <div className="control-row">
-          <button className="control-btn" onClick={resetPositions}>
-            Reset Positions
-          </button>
-        </div>
+
 
         <div className="control-row">
           <button
