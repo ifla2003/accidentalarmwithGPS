@@ -132,7 +132,7 @@ io.on("connection", (socket) => {
 
 // Collision detection function
 async function checkCollisionRisk(currentVehicle, io) {
-  const DANGER_DISTANCE = 3; // 3 meter threshold
+  const DANGER_DISTANCE = 7; // 7 meter threshold
 
   try {
     const allVehicles = await Vehicle.find({

@@ -40,9 +40,9 @@ const VehicleMap = ({ vehicles }) => {
           minDistance = distance;
         }
         
-        if (distance <= 3) { // 3 meter - collision risk
+        if (distance <= 7) { // 7 meter - collision risk
           status = 'collision';
-        } else if (distance <= 5 && status !== 'collision') { // 5 meters - warning zone
+        } else if (distance <= 10 && status !== 'collision') { // 10 meters - warning zone
           status = 'warning';
         }
       }
@@ -237,15 +237,15 @@ const VehicleMap = ({ vehicles }) => {
         <div className="visual-map-legend">
           <div className="legend-item">
             <div className="legend-dot safe"></div>
-            <span>Safe Distance</span>
+            <span>Safe Distance (&gt;10m)</span>
           </div>
           <div className="legend-item">
             <div className="legend-dot warning"></div>
-            <span>Warning Zone</span>
+            <span>Warning Zone (7-10m)</span>
           </div>
           <div className="legend-item">
             <div className="legend-dot collision"></div>
-            <span>Collision Risk</span>
+            <span>Collision Risk (&lt;7m)</span>
           </div>
         </div>
 
@@ -285,7 +285,7 @@ const VehicleMap = ({ vehicles }) => {
                         </div>
                         <div className="coordinate-row">
                           <span className="label">Accuracy:</span>
-                          <span className="value">±{vehicle.currentLocation.accuracy || 'N/A'}m</span>
+                          <span className="value">±{vehicle.currentLocation.accuracy || '5'}m</span>
                         </div>
                         {minDistance && (
                           <div className="coordinate-row">

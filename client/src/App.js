@@ -6,6 +6,7 @@ import MapDemo from "./components/MapDemo";
 import "./App.css";
 
 const socket = io("http://localhost:5000");
+//const socket = io("https://vehiclecollisionapp.testatozas.in");
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -14,8 +15,8 @@ function App() {
   const [systemStatus, setSystemStatus] = useState({
     monitoring: "Active",
     lastUpdate: new Date().toLocaleTimeString(),
-    collisionThreshold: 3,
-    warningThreshold: 5,
+    collisionThreshold: 7,
+    warningThreshold: 10,
     maxRange: "0.6km / 10km max range",
   });
 

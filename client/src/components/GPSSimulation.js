@@ -24,6 +24,44 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
     setSimulationData({});
   };
 
+  const getCurrentLocation = () => {
+    if (vehicles.length === 0) {
+      alert("Please register some vehicles first!");
+      return;
+    }
+
+    if (navigator.geolocation) {
+      vehicles.forEach((vehicle) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const locationData = {
+              phoneNumber: vehicle.phoneNumber,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: new Date().toISOString(),
+              speed: position.coords.speed || 0,
+              heading: position.coords.heading || 0,
+            };
+            console.log(`Current location for ${vehicle.vehicleId}:`, locationData);
+            onLocationUpdate(locationData);
+          },
+          (error) => {
+            console.error("GPS Error for", vehicle.vehicleId, ":", error);
+            alert(`Could not get location for ${vehicle.vehicleId}: ${error.message}`);
+          },
+          { 
+            enableHighAccuracy: true, 
+            maximumAge: 0, // Force fresh location
+            timeout: 10000 
+          }
+        );
+      });
+    } else {
+      alert("GPS not supported on this device/browser.");
+    }
+  };
+
   const startGPSTracking = (vehicle) => {
     if (navigator.geolocation) {
       const watchId = navigator.geolocation.watchPosition(
@@ -33,21 +71,25 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString(),
+            speed: position.coords.speed || 0,
+            heading: position.coords.heading || 0,
           };
+          console.log(`Real GPS update for ${vehicle.vehicleId}:`, locationData);
           onLocationUpdate(locationData);
         },
         (error) => {
-          console.error("GPS Error:", error);
-          let errorMessage = "GPS Error: ";
+          console.error("GPS Error for", vehicle.vehicleId, ":", error);
+          let errorMessage = `GPS Error for ${vehicle.vehicleId}: `;
           switch(error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage += "Location access denied. Please enable GPS and grant location permissions.";
+              errorMessage += "Location access denied. Please enable GPS and grant location permissions in your browser settings.";
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage += "Location information unavailable. Please check your GPS settings.";
+              errorMessage += "Location information unavailable. Please check your GPS settings and ensure you're not in airplane mode.";
               break;
             case error.TIMEOUT:
-              errorMessage += "Location request timed out. Please try again.";
+              errorMessage += "Location request timed out. Please try again or check your GPS signal.";
               break;
             default:
               errorMessage += "Unknown GPS error occurred.";
@@ -55,13 +97,19 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
           }
           alert(errorMessage);
         },
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+        { 
+          enableHighAccuracy: true, 
+          maximumAge: 500, // More frequent updates
+          timeout: 15000 // Longer timeout for better GPS lock
+        }
       );
 
       setSimulationData((prev) => ({
         ...prev,
-        [vehicle.phoneNumber]: { watchId },
+        [vehicle.phoneNumber]: { watchId, isTracking: true },
       }));
+      
+      console.log(`Started real GPS tracking for ${vehicle.vehicleId} (${vehicle.phoneNumber})`);
     } else {
       alert("GPS not supported on this device/browser. Use simulation buttons instead.");
     }
@@ -95,9 +143,9 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
             accuracy: 5,
           };
         } else if (index === 1) {
-          // Second vehicle exactly 2.5 meters away from first
+          // Second vehicle exactly 6 meters away from first (within collision threshold)
           // Using precise GPS coordinate conversion
-          const targetDistance = 2.5; // meters
+          const targetDistance = 6; // meters
           
           // More accurate conversion: 1 degree latitude = 111,320 meters
           const metersPerDegreeLat = 111320;
@@ -273,7 +321,7 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
             className={`control-btn ${isMonitoring ? "active" : ""}`}
             onClick={handleStartMonitoring}
           >
-            Start Monitoring
+            Start Real GPS Monitoring
           </button>
           <button className="control-btn stop" onClick={handleStopMonitoring}>
             Stop Monitoring
@@ -282,10 +330,19 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
 
         <div className="control-row">
           <button
+            className="control-btn info"
+            onClick={getCurrentLocation}
+          >
+            Get Current Location Now
+          </button>
+        </div>
+
+        <div className="control-row">
+          <button
             className="control-btn warning"
             onClick={simulateNearCollision}
           >
-            Simulate Near Collision (2.5m)
+            Simulate Near Collision (6m)
           </button>
           <button
             className="control-btn danger"
