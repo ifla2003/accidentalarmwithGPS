@@ -415,6 +415,10 @@ function App() {
     socket.emit("remove-vehicle", { phoneNumber });
   };
 
+  const handleToggleDriving = (phoneNumber, isDriving) => {
+    socket.emit("toggle-driving", { phoneNumber, isDriving });
+  };
+
   const handleLocationUpdate = (vehicleData) => {
     socket.emit("location-update", vehicleData);
   };
@@ -513,6 +517,7 @@ function App() {
           currentUser={currentUser}
           onAddVehicle={handleAddVehicle}
           onRemoveVehicle={handleRemoveVehicle}
+          onToggleDriving={handleToggleDriving}
           onLocationUpdate={handleLocationUpdate}
         />
 

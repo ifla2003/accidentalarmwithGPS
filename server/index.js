@@ -38,6 +38,7 @@ const vehicleSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
   },
   isActive: { type: Boolean, default: true },
+  isDriving: { type: Boolean, default: true },
 });
 
 const Vehicle = mongoose.model("Vehicle", vehicleSchema);
@@ -82,6 +83,28 @@ io.on("connection", (socket) => {
       io.emit("vehicles-update", allVehicles);
     } catch (error) {
       console.error("Remove vehicle error:", error);
+    }
+  });
+
+  socket.on("toggle-driving", async (data) => {
+    const { phoneNumber, isDriving } = data;
+
+    try {
+      const vehicle = await Vehicle.findOneAndUpdate(
+        { phoneNumber },
+        { isDriving },
+        { new: true }
+      );
+
+      if (vehicle) {
+        console.log(`Vehicle ${vehicle.vehicleId} driving status updated to: ${isDriving}`);
+        
+        // Send updated vehicle list to all clients
+        const allVehicles = await Vehicle.find({ isActive: true });
+        io.emit("vehicles-update", allVehicles);
+      }
+    } catch (error) {
+      console.error("Toggle driving error:", error);
     }
   });
 
@@ -147,13 +170,20 @@ async function checkCollisionRisk(currentVehicle, io) {
       return;
     }
 
-    // Find other active vehicles with valid location data
+    // Find other active vehicles with valid location data and are driving
     const allVehicles = await Vehicle.find({
       isActive: true,
+      isDriving: true, // Only check collision with driving vehicles
       phoneNumber: { $ne: currentVehicle.phoneNumber },
       'currentLocation.latitude': { $exists: true, $ne: null },
       'currentLocation.longitude': { $exists: true, $ne: null }
     });
+
+    // Also skip collision check if current vehicle is stopped
+    if (!currentVehicle.isDriving) {
+      console.log(`Vehicle ${currentVehicle.vehicleId} is stopped, skipping collision check`);
+      return;
+    }
 
     console.log(`Checking collision for ${currentVehicle.vehicleId} against ${allVehicles.length} other vehicles with location data`);
 

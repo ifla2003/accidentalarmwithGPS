@@ -12,6 +12,7 @@ const Dashboard = ({
   currentUser,
   onAddVehicle,
   onRemoveVehicle,
+  onToggleDriving,
   onLocationUpdate,
 }) => {
   return (
@@ -20,6 +21,7 @@ const Dashboard = ({
         <RegisteredVehicles
           vehicles={vehicles}
           onRemoveVehicle={onRemoveVehicle}
+          onToggleDriving={onToggleDriving}
         />
         <GPSSimulation
           vehicles={vehicles}
