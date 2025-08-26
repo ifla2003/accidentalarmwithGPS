@@ -1,5 +1,5 @@
 import React from "react";
-import VehicleRegistration from "./VehicleRegistration";
+
 import RegisteredVehicles from "./RegisteredVehicles";
 import GPSSimulation from "./GPSSimulation";
 import SystemStatus from "./SystemStatus";
@@ -9,6 +9,7 @@ import "./Dashboard.css";
 const Dashboard = ({
   vehicles,
   systemStatus,
+  currentUser,
   onAddVehicle,
   onRemoveVehicle,
   onLocationUpdate,
@@ -16,13 +17,13 @@ const Dashboard = ({
   return (
     <div className="dashboard">
       <div className="dashboard-row">
-        <VehicleRegistration onAddVehicle={onAddVehicle} />
         <RegisteredVehicles
           vehicles={vehicles}
           onRemoveVehicle={onRemoveVehicle}
         />
         <GPSSimulation
           vehicles={vehicles}
+          currentUser={currentUser}
           onLocationUpdate={onLocationUpdate}
         />
       </div>

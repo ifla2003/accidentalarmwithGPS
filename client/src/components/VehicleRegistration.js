@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import './VehicleRegistration.css';
+import React, { useState } from "react";
+import "./VehicleRegistration.css";
 
 const VehicleRegistration = ({ onAddVehicle }) => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [vehicleId, setVehicleId] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [vehicleId, setVehicleId] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (phoneNumber.trim() && vehicleId.trim()) {
       onAddVehicle(phoneNumber.trim(), vehicleId.trim());
-      setPhoneNumber('');
-      setVehicleId('');
+      setPhoneNumber("");
+      setVehicleId("");
     }
   };
 

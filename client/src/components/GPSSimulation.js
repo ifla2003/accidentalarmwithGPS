@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import "./GPSSimulation.css";
 
-const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
+const GPSSimulation = ({ vehicles, currentUser, onLocationUpdate }) => {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [simulationData, setSimulationData] = useState({});
 
   const handleStartMonitoring = () => {
+    if (!currentUser) {
+      alert("No user logged in!");
+      return;
+    }
+    
     setIsMonitoring(true);
-    // Start GPS monitoring for all vehicles
-    vehicles.forEach((vehicle) => {
-      startGPSTracking(vehicle);
-    });
+    // Start GPS monitoring for current user
+    startGPSTracking(currentUser);
   };
 
   const handleStopMonitoring = () => {
@@ -25,94 +28,112 @@ const GPSSimulation = ({ vehicles, onLocationUpdate }) => {
   };
 
   const getCurrentLocation = () => {
-    if (vehicles.length === 0) {
-      alert("Please register some vehicles first!");
+    if (!currentUser) {
+      alert("No user logged in!");
       return;
     }
 
-    if (navigator.geolocation) {
-      vehicles.forEach((vehicle) => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const locationData = {
-              phoneNumber: vehicle.phoneNumber,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: new Date().toISOString(),
-              speed: position.coords.speed || 0,
-              heading: position.coords.heading || 0,
-            };
-            console.log(`Current location for ${vehicle.vehicleId}:`, locationData);
-            onLocationUpdate(locationData);
-          },
-          (error) => {
-            console.error("GPS Error for", vehicle.vehicleId, ":", error);
-            alert(`Could not get location for ${vehicle.vehicleId}: ${error.message}`);
-          },
-          { 
-            enableHighAccuracy: true, 
-            maximumAge: 0, // Force fresh location
-            timeout: 10000 
-          }
-        );
-      });
-    } else {
+    if (!navigator.geolocation) {
       alert("GPS not supported on this device/browser.");
+      return;
     }
+
+    console.log(`Getting current location for ${currentUser.name}...`);
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const locationData = {
+          phoneNumber: currentUser.phoneNumber,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: new Date().toISOString(),
+          speed: position.coords.speed || 0,
+          heading: position.coords.heading || 0,
+        };
+        console.log(`Current location for ${currentUser.name}:`, locationData);
+        onLocationUpdate(locationData);
+        alert(`Location updated for ${currentUser.name}!\nLat: ${position.coords.latitude.toFixed(6)}\nLng: ${position.coords.longitude.toFixed(6)}\nAccuracy: ±${position.coords.accuracy}m`);
+      },
+      (error) => {
+        console.error("GPS Error for", currentUser.name, ":", error);
+        let errorMessage = `Could not get location for ${currentUser.name}: `;
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "Location access denied. Please enable GPS permissions.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "GPS signal unavailable. Try going outside or near a window.";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "GPS timeout. Please try again.";
+            break;
+          default:
+            errorMessage += error.message || "Unknown GPS error.";
+            break;
+        }
+        alert(errorMessage);
+      },
+      { 
+        enableHighAccuracy: true, 
+        maximumAge: 0, // Force fresh location
+        timeout: 20000 // Longer timeout
+      }
+    );
   };
 
-  const startGPSTracking = (vehicle) => {
-    if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const locationData = {
-            phoneNumber: vehicle.phoneNumber,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: new Date().toISOString(),
-            speed: position.coords.speed || 0,
-            heading: position.coords.heading || 0,
-          };
-          console.log(`Real GPS update for ${vehicle.vehicleId}:`, locationData);
-          onLocationUpdate(locationData);
-        },
-        (error) => {
-          console.error("GPS Error for", vehicle.vehicleId, ":", error);
-          let errorMessage = `GPS Error for ${vehicle.vehicleId}: `;
-          switch(error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage += "Location access denied. Please enable GPS and grant location permissions in your browser settings.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage += "Location information unavailable. Please check your GPS settings and ensure you're not in airplane mode.";
-              break;
-            case error.TIMEOUT:
-              errorMessage += "Location request timed out. Please try again or check your GPS signal.";
-              break;
-            default:
-              errorMessage += "Unknown GPS error occurred.";
-              break;
-          }
-          alert(errorMessage);
-        },
-        { 
-          enableHighAccuracy: true, 
-          maximumAge: 500, // More frequent updates
-          timeout: 15000 // Longer timeout for better GPS lock
-        }
-      );
-
-      setSimulationData((prev) => ({
-        ...prev,
-        [vehicle.phoneNumber]: { watchId, isTracking: true },
-      }));
-      
-      console.log(`Started real GPS tracking for ${vehicle.vehicleId} (${vehicle.phoneNumber})`);
-    } else {
+  const startGPSTracking = (user) => {
+    if (!navigator.geolocation) {
       alert("GPS not supported on this device/browser. Use simulation buttons instead.");
+      return;
     }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const locationData = {
+          phoneNumber: user.phoneNumber,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: new Date().toISOString(),
+          speed: position.coords.speed || 0,
+          heading: position.coords.heading || 0,
+        };
+        console.log(`Real GPS update for ${user.name}:`, locationData);
+        onLocationUpdate(locationData);
+      },
+      (error) => {
+        console.error("GPS Error for", user.name, ":", error);
+        let errorMessage = `GPS Error for ${user.name}: `;
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "Location access denied. Please enable GPS and grant location permissions in your browser settings.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "Location information unavailable. Please check your GPS settings and ensure you're not in airplane mode.";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "Location request timed out. Please try again or check your GPS signal.";
+            break;
+          default:
+            errorMessage += "Unknown GPS error occurred.";
+            break;
+        }
+        alert(errorMessage);
+      },
+      { 
+        enableHighAccuracy: true, 
+        maximumAge: 500, // More frequent updates
+        timeout: 15000 // Longer timeout for better GPS lock
+      }
+    );
+
+    setSimulationData((prev) => ({
+      ...prev,
+      [user.phoneNumber]: { watchId, isTracking: true },
+    }));
+    
+    console.log(`Started real GPS tracking for ${user.name} (${user.phoneNumber})`);
   };
 
   const simulateNearCollision = () => {

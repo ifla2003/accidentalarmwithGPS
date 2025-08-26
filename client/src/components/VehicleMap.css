@@ -312,6 +312,11 @@
   font-weight: 600;
 }
 
+.coordinate-row .value.simulated {
+  color: #f39c12;
+  font-weight: bold;
+}
+
 .no-location {
   text-align: center;
   padding: 15px;

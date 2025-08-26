@@ -97,7 +97,9 @@ io.on("connection", (socket) => {
   socket.on("location-update", async (data) => {
     const { phoneNumber, latitude, longitude } = data;
 
-    console.log(`Location update received: ${phoneNumber} -> ${latitude}, ${longitude}`);
+    console.log(
+      `Location update received: ${phoneNumber} -> ${latitude}, ${longitude}`
+    );
 
     try {
       // Update vehicle location
@@ -110,8 +112,10 @@ io.on("connection", (socket) => {
       );
 
       if (vehicle) {
-        console.log(`Vehicle ${vehicle.vehicleId} updated in DB: ${vehicle.currentLocation.latitude}, ${vehicle.currentLocation.longitude}`);
-        
+        console.log(
+          `Vehicle ${vehicle.vehicleId} updated in DB: ${vehicle.currentLocation.latitude}, ${vehicle.currentLocation.longitude}`
+        );
+
         // Check for nearby vehicles
         await checkCollisionRisk(vehicle, io);
 
@@ -135,16 +139,29 @@ async function checkCollisionRisk(currentVehicle, io) {
   const DANGER_DISTANCE = 7; // 7 meter threshold
 
   try {
+    // Only check collision if current vehicle has valid location data
+    if (!currentVehicle.currentLocation || 
+        !currentVehicle.currentLocation.latitude || 
+        !currentVehicle.currentLocation.longitude) {
+      console.log(`Vehicle ${currentVehicle.vehicleId} has no location data, skipping collision check`);
+      return;
+    }
+
+    // Find other active vehicles with valid location data
     const allVehicles = await Vehicle.find({
       isActive: true,
       phoneNumber: { $ne: currentVehicle.phoneNumber },
+      'currentLocation.latitude': { $exists: true, $ne: null },
+      'currentLocation.longitude': { $exists: true, $ne: null }
     });
 
+    console.log(`Checking collision for ${currentVehicle.vehicleId} against ${allVehicles.length} other vehicles with location data`);
+
     for (const otherVehicle of allVehicles) {
-      if (
-        otherVehicle.currentLocation.latitude &&
-        otherVehicle.currentLocation.longitude
-      ) {
+      // Double-check that location data is valid
+      if (otherVehicle.currentLocation.latitude && 
+          otherVehicle.currentLocation.longitude) {
+        
         const distance = getDistance(
           {
             latitude: currentVehicle.currentLocation.latitude,
@@ -157,11 +174,17 @@ async function checkCollisionRisk(currentVehicle, io) {
         );
 
         // Log coordinates and distance calculation for debugging
-        console.log(`Vehicle ${currentVehicle.vehicleId} at: ${currentVehicle.currentLocation.latitude}, ${currentVehicle.currentLocation.longitude}`);
-        console.log(`Vehicle ${otherVehicle.vehicleId} at: ${otherVehicle.currentLocation.latitude}, ${otherVehicle.currentLocation.longitude}`);
-        console.log(`Distance between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}: ${distance} meters`);
-        
-        // Convert distance from meters to check threshold
+        console.log(
+          `Vehicle ${currentVehicle.vehicleId} at: ${currentVehicle.currentLocation.latitude}, ${currentVehicle.currentLocation.longitude}`
+        );
+        console.log(
+          `Vehicle ${otherVehicle.vehicleId} at: ${otherVehicle.currentLocation.latitude}, ${otherVehicle.currentLocation.longitude}`
+        );
+        console.log(
+          `Distance between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}: ${distance} meters`
+        );
+
+        // Check if distance is within danger threshold
         if (distance <= DANGER_DISTANCE) {
           const alertData = {
             type: "COLLISION_WARNING",
@@ -169,16 +192,18 @@ async function checkCollisionRisk(currentVehicle, io) {
             vehicle1: {
               phoneNumber: currentVehicle.phoneNumber,
               vehicleId: currentVehicle.vehicleId,
+              location: currentVehicle.currentLocation
             },
             vehicle2: {
               phoneNumber: otherVehicle.phoneNumber,
               vehicleId: otherVehicle.vehicleId,
+              location: otherVehicle.currentLocation
             },
             timestamp: new Date(),
           };
 
-          console.log(`COLLISION ALERT: ${distance} meters between vehicles`);
-          
+          console.log(`🚨 COLLISION ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`);
+
           // Send alert to all clients (broadcast collision warning)
           io.emit("collision-alert", alertData);
         }

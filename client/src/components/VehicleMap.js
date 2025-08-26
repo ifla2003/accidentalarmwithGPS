@@ -251,29 +251,43 @@ const VehicleMap = ({ vehicles }) => {
 
         <div className="vehicle-locations-list">
           <h4>Current Vehicle Locations</h4>
-          {vehicles.length === 0 ? (
-            <p className="no-vehicles-message">No vehicles registered yet.</p>
-          ) : (
-            <div className="locations-grid">
-              {vehicles.map((vehicle) => {
-                const { status, minDistance } = getVehicleStatus(vehicle);
-                return (
-                  <div key={vehicle.phoneNumber} className={`location-card ${status}`}>
-                    <div className="location-header">
-                      <div 
-                        className="status-dot" 
-                        style={{ backgroundColor: getStatusColor(status) }}
-                      ></div>
-                      <div className="vehicle-details">
-                        <h5>{vehicle.vehicleId}</h5>
-                        <span className="phone-number">{vehicle.phoneNumber}</span>
+          {(() => {
+            // Filter vehicles that have GPS location data
+            const vehiclesWithLocation = vehicles.filter(v => 
+              v.currentLocation && v.currentLocation.latitude && v.currentLocation.longitude
+            );
+            
+            if (vehiclesWithLocation.length === 0) {
+              return (
+                <p className="no-vehicles-message">
+                  {vehicles.length === 0 
+                    ? "No vehicles registered yet." 
+                    : "No vehicles with GPS location data yet. Start GPS tracking to see vehicles here."
+                  }
+                </p>
+              );
+            }
+            
+            return (
+              <div className="locations-grid">
+                {vehiclesWithLocation.map((vehicle) => {
+                  const { status, minDistance } = getVehicleStatus(vehicle);
+                  return (
+                    <div key={vehicle.phoneNumber} className={`location-card ${status}`}>
+                      <div className="location-header">
+                        <div 
+                          className="status-dot" 
+                          style={{ backgroundColor: getStatusColor(status) }}
+                        ></div>
+                        <div className="vehicle-details">
+                          <h5>{vehicle.vehicleId}</h5>
+                          <span className="phone-number">{vehicle.phoneNumber}</span>
+                        </div>
+                        <div className={`status-badge ${status}`}>
+                          {status.toUpperCase()}
+                        </div>
                       </div>
-                      <div className={`status-badge ${status}`}>
-                        {status.toUpperCase()}
-                      </div>
-                    </div>
-                    
-                    {vehicle.currentLocation && vehicle.currentLocation.latitude ? (
+                      
                       <div className="location-info">
                         <div className="coordinate-row">
                           <span className="label">Latitude:</span>
@@ -299,18 +313,19 @@ const VehicleMap = ({ vehicles }) => {
                             {new Date(vehicle.lastUpdate || vehicle.currentLocation.timestamp).toLocaleTimeString()}
                           </span>
                         </div>
+                        {vehicle.currentLocation.isSimulated && (
+                          <div className="coordinate-row">
+                            <span className="label">Type:</span>
+                            <span className="value simulated">📍 Simulated Location</span>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="no-location">
-                        <p>📍 No GPS data available</p>
-                        <p>Start monitoring to get location</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
