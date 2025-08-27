@@ -3,7 +3,9 @@ import './RegisteredVehicles.css';
 
 const RegisteredVehicles = ({ vehicles, onRemoveVehicle, onToggleDriving }) => {
   const getVehicleStatus = (vehicle) => {
-    if (!vehicle.currentLocation) return 'NO GPS';
+    if (!vehicle.currentLocation || 
+        vehicle.currentLocation.latitude == null || 
+        vehicle.currentLocation.longitude == null) return 'NO GPS';
     if (!vehicle.isDriving) return 'STOPPED';
     
     // Check collision status based on location
@@ -25,7 +27,11 @@ const RegisteredVehicles = ({ vehicles, onRemoveVehicle, onToggleDriving }) => {
   };
 
   const calculateDistance = (vehicle1, vehicle2) => {
-    if (!vehicle1.currentLocation || !vehicle2.currentLocation) return Infinity;
+    if (!vehicle1.currentLocation || !vehicle2.currentLocation ||
+        vehicle1.currentLocation.latitude == null || vehicle1.currentLocation.longitude == null ||
+        vehicle2.currentLocation.latitude == null || vehicle2.currentLocation.longitude == null) {
+      return Infinity;
+    }
     
     const lat1 = vehicle1.currentLocation.latitude;
     const lng1 = vehicle1.currentLocation.longitude;
@@ -78,7 +84,9 @@ const RegisteredVehicles = ({ vehicles, onRemoveVehicle, onToggleDriving }) => {
                     </div>
                   </div>
                   <div className="vehicle-phone">{vehicle.phoneNumber}</div>
-                  {vehicle.currentLocation && (
+                  {vehicle.currentLocation && 
+                   vehicle.currentLocation.latitude != null && 
+                   vehicle.currentLocation.longitude != null && (
                     <div className="vehicle-location">
                       📍 {vehicle.currentLocation.latitude.toFixed(4)}, {vehicle.currentLocation.longitude.toFixed(4)}
                     </div>

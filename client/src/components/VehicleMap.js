@@ -205,7 +205,7 @@ const VehicleMap = ({ vehicles }) => {
 
   return (
     <div className="dashboard-panel vehicle-positions-panel">
-      <h3>Vehicle Positions</h3>
+      <h3>Proximity Visualization</h3>
       <div className="visual-map-container">
         <canvas
           ref={canvasRef}
@@ -226,7 +226,7 @@ const VehicleMap = ({ vehicles }) => {
               <h4>🚗 {hoveredVehicle.vehicleId}</h4>
               <p><strong>Phone:</strong> {hoveredVehicle.phoneNumber}</p>
               <p><strong>Status:</strong> {getVehicleStatus(hoveredVehicle).status.toUpperCase()}</p>
-              <p><strong>GPS:</strong> {hoveredVehicle.currentLocation.latitude.toFixed(6)}, {hoveredVehicle.currentLocation.longitude.toFixed(6)}</p>
+              <p><strong>GPS:</strong> {hoveredVehicle.currentLocation.latitude?.toFixed(6) || 'N/A'}, {hoveredVehicle.currentLocation.longitude?.toFixed(6) || 'N/A'}</p>
               {getVehicleStatus(hoveredVehicle).minDistance && (
                 <p><strong>Nearest:</strong> {getVehicleStatus(hoveredVehicle).minDistance.toFixed(1)}m</p>
               )}
@@ -249,84 +249,7 @@ const VehicleMap = ({ vehicles }) => {
           </div>
         </div>
 
-        <div className="vehicle-locations-list">
-          <h4>Current Vehicle Locations</h4>
-          {(() => {
-            // Filter vehicles that have GPS location data
-            const vehiclesWithLocation = vehicles.filter(v => 
-              v.currentLocation && v.currentLocation.latitude && v.currentLocation.longitude
-            );
-            
-            if (vehiclesWithLocation.length === 0) {
-              return (
-                <p className="no-vehicles-message">
-                  {vehicles.length === 0 
-                    ? "No vehicles registered yet." 
-                    : "No vehicles with GPS location data yet. Start GPS tracking to see vehicles here."
-                  }
-                </p>
-              );
-            }
-            
-            return (
-              <div className="locations-grid">
-                {vehiclesWithLocation.map((vehicle) => {
-                  const { status, minDistance } = getVehicleStatus(vehicle);
-                  return (
-                    <div key={vehicle.phoneNumber} className={`location-card ${status}`}>
-                      <div className="location-header">
-                        <div 
-                          className="status-dot" 
-                          style={{ backgroundColor: getStatusColor(status) }}
-                        ></div>
-                        <div className="vehicle-details">
-                          <h5>{vehicle.vehicleId}</h5>
-                          <span className="phone-number">{vehicle.phoneNumber}</span>
-                        </div>
-                        <div className={`status-badge ${status}`}>
-                          {status.toUpperCase()}
-                        </div>
-                      </div>
-                      
-                      <div className="location-info">
-                        <div className="coordinate-row">
-                          <span className="label">Latitude:</span>
-                          <span className="coordinate">{vehicle.currentLocation.latitude.toFixed(6)}</span>
-                        </div>
-                        <div className="coordinate-row">
-                          <span className="label">Longitude:</span>
-                          <span className="coordinate">{vehicle.currentLocation.longitude.toFixed(6)}</span>
-                        </div>
-                        <div className="coordinate-row">
-                          <span className="label">Accuracy:</span>
-                          <span className="value">±{vehicle.currentLocation.accuracy || '5'}m</span>
-                        </div>
-                        {minDistance && (
-                          <div className="coordinate-row">
-                            <span className="label">Nearest Vehicle:</span>
-                            <span className="value">{minDistance.toFixed(1)}m</span>
-                          </div>
-                        )}
-                        <div className="coordinate-row">
-                          <span className="label">Last Update:</span>
-                          <span className="value">
-                            {new Date(vehicle.lastUpdate || vehicle.currentLocation.timestamp).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        {vehicle.currentLocation.isSimulated && (
-                          <div className="coordinate-row">
-                            <span className="label">Type:</span>
-                            <span className="value simulated">📍 Simulated Location</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </div>
+
       </div>
     </div>
   );

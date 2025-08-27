@@ -36,9 +36,14 @@ const vehicleSchema = new mongoose.Schema({
     latitude: Number,
     longitude: Number,
     timestamp: { type: Date, default: Date.now },
+    accuracy: Number,
+    speed: Number,
+    heading: Number,
+    isSimulated: { type: Boolean, default: false },
   },
   isActive: { type: Boolean, default: true },
   isDriving: { type: Boolean, default: true },
+  locationTrackingEnabled: { type: Boolean, default: false },
 });
 
 const Vehicle = mongoose.model("Vehicle", vehicleSchema);
@@ -57,7 +62,7 @@ io.on("connection", (socket) => {
     // Update or create vehicle in database
     const vehicle = await Vehicle.findOneAndUpdate(
       { phoneNumber },
-      { vehicleId, isActive: true },
+      { vehicleId, isActive: true, locationTrackingEnabled: true },
       { upsert: true, new: true }
     );
 
@@ -97,14 +102,61 @@ io.on("connection", (socket) => {
       );
 
       if (vehicle) {
-        console.log(`Vehicle ${vehicle.vehicleId} driving status updated to: ${isDriving}`);
-        
+        console.log(
+          `Vehicle ${vehicle.vehicleId} driving status updated to: ${isDriving}`
+        );
+
         // Send updated vehicle list to all clients
         const allVehicles = await Vehicle.find({ isActive: true });
         io.emit("vehicles-update", allVehicles);
       }
     } catch (error) {
       console.error("Toggle driving error:", error);
+    }
+  });
+
+  socket.on("toggle-location-tracking", async (data) => {
+    const { phoneNumber, locationTrackingEnabled } = data;
+
+    try {
+      const vehicle = await Vehicle.findOneAndUpdate(
+        { phoneNumber },
+        { locationTrackingEnabled },
+        { new: true }
+      );
+
+      if (vehicle) {
+        console.log(
+          `Vehicle ${vehicle.vehicleId} location tracking updated to: ${locationTrackingEnabled}`
+        );
+
+        // Send updated vehicle list to all clients
+        const allVehicles = await Vehicle.find({ isActive: true });
+        io.emit("vehicles-update", allVehicles);
+
+        // Also send updated all users list
+        const allUsers = await Vehicle.find({
+          locationTrackingEnabled: true,
+          "currentLocation.latitude": { $exists: true, $ne: null },
+          "currentLocation.longitude": { $exists: true, $ne: null },
+        }).sort({ "currentLocation.timestamp": -1 });
+        io.emit("all-users-update", allUsers);
+
+        // Send specific response to the requesting client
+        socket.emit("location-tracking-updated", {
+          phoneNumber,
+          locationTrackingEnabled,
+          success: true,
+        });
+      }
+    } catch (error) {
+      console.error("Toggle location tracking error:", error);
+      socket.emit("location-tracking-updated", {
+        phoneNumber,
+        locationTrackingEnabled: false,
+        success: false,
+        error: error.message,
+      });
     }
   });
 
@@ -117,19 +169,62 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("get-all-users", async () => {
+    try {
+      // Fetch all users with location tracking enabled and valid location data
+      const allUsers = await Vehicle.find({
+        locationTrackingEnabled: true,
+        "currentLocation.latitude": { $exists: true, $ne: null },
+        "currentLocation.longitude": { $exists: true, $ne: null },
+      }).sort({ "currentLocation.timestamp": -1 });
+
+      console.log(`Fetched ${allUsers.length} users with location data`);
+      socket.emit("all-users-update", allUsers);
+    } catch (error) {
+      console.error("Get all users error:", error);
+      socket.emit("all-users-update", []);
+    }
+  });
+
   socket.on("location-update", async (data) => {
-    const { phoneNumber, latitude, longitude } = data;
+    const {
+      phoneNumber,
+      latitude,
+      longitude,
+      accuracy,
+      speed,
+      heading,
+      isSimulated,
+    } = data;
 
     console.log(
       `Location update received: ${phoneNumber} -> ${latitude}, ${longitude}`
     );
 
     try {
-      // Update vehicle location
+      // First check if the vehicle has location tracking enabled
+      const existingVehicle = await Vehicle.findOne({ phoneNumber });
+
+      if (!existingVehicle || !existingVehicle.locationTrackingEnabled) {
+        console.log(
+          `Location update ignored for ${phoneNumber} - location tracking disabled`
+        );
+        return;
+      }
+
+      // Update vehicle location with additional data
       const vehicle = await Vehicle.findOneAndUpdate(
         { phoneNumber },
         {
-          currentLocation: { latitude, longitude, timestamp: new Date() },
+          currentLocation: {
+            latitude,
+            longitude,
+            timestamp: new Date(),
+            accuracy: accuracy || null,
+            speed: speed || null,
+            heading: heading || null,
+            isSimulated: isSimulated || false,
+          },
         },
         { new: true }
       );
@@ -145,6 +240,14 @@ io.on("connection", (socket) => {
         // Send updated vehicle list to all clients
         const allVehicles = await Vehicle.find({ isActive: true });
         io.emit("vehicles-update", allVehicles);
+
+        // Also send updated all users list
+        const allUsers = await Vehicle.find({
+          locationTrackingEnabled: true,
+          "currentLocation.latitude": { $exists: true, $ne: null },
+          "currentLocation.longitude": { $exists: true, $ne: null },
+        }).sort({ "currentLocation.timestamp": -1 });
+        io.emit("all-users-update", allUsers);
       }
     } catch (error) {
       console.error("Location update error:", error);
@@ -163,10 +266,14 @@ async function checkCollisionRisk(currentVehicle, io) {
 
   try {
     // Only check collision if current vehicle has valid location data
-    if (!currentVehicle.currentLocation || 
-        !currentVehicle.currentLocation.latitude || 
-        !currentVehicle.currentLocation.longitude) {
-      console.log(`Vehicle ${currentVehicle.vehicleId} has no location data, skipping collision check`);
+    if (
+      !currentVehicle.currentLocation ||
+      !currentVehicle.currentLocation.latitude ||
+      !currentVehicle.currentLocation.longitude
+    ) {
+      console.log(
+        `Vehicle ${currentVehicle.vehicleId} has no location data, skipping collision check`
+      );
       return;
     }
 
@@ -175,23 +282,28 @@ async function checkCollisionRisk(currentVehicle, io) {
       isActive: true,
       isDriving: true, // Only check collision with driving vehicles
       phoneNumber: { $ne: currentVehicle.phoneNumber },
-      'currentLocation.latitude': { $exists: true, $ne: null },
-      'currentLocation.longitude': { $exists: true, $ne: null }
+      "currentLocation.latitude": { $exists: true, $ne: null },
+      "currentLocation.longitude": { $exists: true, $ne: null },
     });
 
     // Also skip collision check if current vehicle is stopped
     if (!currentVehicle.isDriving) {
-      console.log(`Vehicle ${currentVehicle.vehicleId} is stopped, skipping collision check`);
+      console.log(
+        `Vehicle ${currentVehicle.vehicleId} is stopped, skipping collision check`
+      );
       return;
     }
 
-    console.log(`Checking collision for ${currentVehicle.vehicleId} against ${allVehicles.length} other vehicles with location data`);
+    console.log(
+      `Checking collision for ${currentVehicle.vehicleId} against ${allVehicles.length} other vehicles with location data`
+    );
 
     for (const otherVehicle of allVehicles) {
       // Double-check that location data is valid
-      if (otherVehicle.currentLocation.latitude && 
-          otherVehicle.currentLocation.longitude) {
-        
+      if (
+        otherVehicle.currentLocation.latitude &&
+        otherVehicle.currentLocation.longitude
+      ) {
         const distance = getDistance(
           {
             latitude: currentVehicle.currentLocation.latitude,
@@ -222,17 +334,19 @@ async function checkCollisionRisk(currentVehicle, io) {
             vehicle1: {
               phoneNumber: currentVehicle.phoneNumber,
               vehicleId: currentVehicle.vehicleId,
-              location: currentVehicle.currentLocation
+              location: currentVehicle.currentLocation,
             },
             vehicle2: {
               phoneNumber: otherVehicle.phoneNumber,
               vehicleId: otherVehicle.vehicleId,
-              location: otherVehicle.currentLocation
+              location: otherVehicle.currentLocation,
             },
             timestamp: new Date(),
           };
 
-          console.log(`🚨 COLLISION ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`);
+          console.log(
+            `🚨 COLLISION ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
+          );
 
           // Send alert to all clients (broadcast collision warning)
           io.emit("collision-alert", alertData);
@@ -249,6 +363,21 @@ app.get("/api/vehicles", async (req, res) => {
   try {
     const vehicles = await Vehicle.find({ isActive: true });
     res.json(vehicles);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/all-users", async (req, res) => {
+  try {
+    // Fetch all users with location tracking enabled and valid location data
+    const allUsers = await Vehicle.find({
+      locationTrackingEnabled: true,
+      "currentLocation.latitude": { $exists: true, $ne: null },
+      "currentLocation.longitude": { $exists: true, $ne: null },
+    }).sort({ "currentLocation.timestamp": -1 });
+
+    res.json(allUsers);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

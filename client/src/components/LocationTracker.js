@@ -96,9 +96,9 @@ const LocationTracker = ({ onLocationUpdate, onTrackingChange }) => {
           <div className="location-info">
             <h4>Current Location:</h4>
             <div className="location-details">
-              <p><strong>Latitude:</strong> {location.latitude.toFixed(6)}</p>
-              <p><strong>Longitude:</strong> {location.longitude.toFixed(6)}</p>
-              <p><strong>Accuracy:</strong> ±{location.accuracy.toFixed(1)}m</p>
+              <p><strong>Latitude:</strong> {location.latitude?.toFixed(6) || 'N/A'}</p>
+              <p><strong>Longitude:</strong> {location.longitude?.toFixed(6) || 'N/A'}</p>
+              <p><strong>Accuracy:</strong> ±{location.accuracy?.toFixed(1) || 'N/A'}m</p>
               <p><strong>Last Update:</strong> {location.timestamp.toLocaleTimeString()}</p>
             </div>
           </div>

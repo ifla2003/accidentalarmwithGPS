@@ -6,11 +6,12 @@ import MapDemo from "./components/MapDemo";
 import AuthPage from "./components/AuthPage";
 import "./App.css";
 
-const socket = io("http://localhost:5000");
-//const socket = io("https://vehiclecollisionapp.testatozas.in");
+//const socket = io("http://localhost:5000");
+const socket = io("https://vehiclecollisionapp.testatozas.in");
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [collisionAlert, setCollisionAlert] = useState(null);
   const [demoMode, setDemoMode] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -36,14 +37,21 @@ function App() {
       }));
     });
 
+    // Listen for all users updates
+    socket.on("all-users-update", (userList) => {
+      setAllUsers(userList);
+      console.log(`Received ${userList.length} users with location data`);
+    });
+
     // Listen for collision alerts
     socket.on("collision-alert", (alert) => {
       setCollisionAlert(alert);
       setTimeout(() => setCollisionAlert(null), 10000);
     });
 
-    // Request initial vehicle list
+    // Request initial vehicle list and all users
     socket.emit("get-vehicles");
+    socket.emit("get-all-users");
 
     // Update time every second
     const timeInterval = setInterval(() => {
@@ -53,10 +61,17 @@ function App() {
       }));
     }, 1000);
 
+    // Fetch all users every 10 seconds to get latest positions
+    const usersInterval = setInterval(() => {
+      socket.emit("get-all-users");
+    }, 10000);
+
     return () => {
       socket.off("vehicles-update");
+      socket.off("all-users-update");
       socket.off("collision-alert");
       clearInterval(timeInterval);
+      clearInterval(usersInterval);
     };
   }, []);
 
@@ -70,7 +85,7 @@ function App() {
 
       // Auto-register the user as a vehicle
       handleAddVehicle(userData.phoneNumber, userData.vehicleId);
-      
+
       // Start GPS tracking after a small delay
       setTimeout(() => {
         startContinuousGPSTracking(userData);
@@ -419,6 +434,40 @@ function App() {
     socket.emit("toggle-driving", { phoneNumber, isDriving });
   };
 
+  const handleToggleLocationTracking = (
+    phoneNumber,
+    locationTrackingEnabled
+  ) => {
+    return new Promise((resolve, reject) => {
+      socket.emit("toggle-location-tracking", {
+        phoneNumber,
+        locationTrackingEnabled,
+      });
+
+      // Listen for response
+      const handleResponse = (data) => {
+        if (data.phoneNumber === phoneNumber) {
+          socket.off("location-tracking-updated", handleResponse);
+          if (data.success) {
+            resolve(data);
+          } else {
+            reject(
+              new Error(data.error || "Failed to update location tracking")
+            );
+          }
+        }
+      };
+
+      socket.on("location-tracking-updated", handleResponse);
+
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        socket.off("location-tracking-updated", handleResponse);
+        reject(new Error("Request timeout"));
+      }, 5000);
+    });
+  };
+
   const handleLocationUpdate = (vehicleData) => {
     socket.emit("location-update", vehicleData);
   };
@@ -513,12 +562,17 @@ function App() {
       <main className="App-main">
         <Dashboard
           vehicles={vehicles}
+          allUsers={allUsers}
           systemStatus={systemStatus}
           currentUser={currentUser}
           onAddVehicle={handleAddVehicle}
           onRemoveVehicle={handleRemoveVehicle}
           onToggleDriving={handleToggleDriving}
           onLocationUpdate={handleLocationUpdate}
+          onToggleLocationTracking={handleToggleLocationTracking}
+          gpsStatus={gpsStatus}
+          onStartGPS={() => startContinuousGPSTracking(currentUser)}
+          onStartSimulated={() => startSimulatedLocationDirect(currentUser)}
         />
 
         {collisionAlert && (

@@ -13,6 +13,10 @@
   flex-wrap: wrap;
 }
 
+.dashboard-row.full-width {
+  width: 100%;
+}
+
 .dashboard-panel {
   background: white;
   border-radius: 10px;
