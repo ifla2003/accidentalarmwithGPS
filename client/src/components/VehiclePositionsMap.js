@@ -210,6 +210,7 @@ const VehiclePositionsMap = ({ vehicles, allUsers, currentUser }) => {
                         {isCurrentUser && <span className="current-user-badge">YOU</span>}
                       </h4>
                       <div className="popup-details">
+                        <p><strong>Driver:</strong> {vehicle.fullName || 'Unknown Driver'}</p>
                         <p><strong>Phone:</strong> {vehicle.phoneNumber}</p>
                         <p><strong>Status:</strong> 
                           <span className={`status-text ${status}`}>

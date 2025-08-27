@@ -6,7 +6,7 @@ import MapDemo from "./components/MapDemo";
 import AuthPage from "./components/AuthPage";
 import "./App.css";
 
-//const socket = io("http://localhost:5000");
+//const socket = io("https://vehiclecollisionapp.testatozas.in");
 const socket = io("https://vehiclecollisionapp.testatozas.in");
 
 function App() {
@@ -83,13 +83,11 @@ function App() {
       setCurrentUser(userData);
       setIsAuthenticated(true);
 
-      // Auto-register the user as a vehicle
-      handleAddVehicle(userData.phoneNumber, userData.vehicleId);
+      // Auto-register the user as a vehicle (but don't start GPS automatically)
+      handleAddVehicle(userData.phoneNumber, userData.vehicleId, userData.name);
 
-      // Start GPS tracking after a small delay
-      setTimeout(() => {
-        startContinuousGPSTracking(userData);
-      }, 500);
+      // Set GPS status to inactive so user needs to manually enable it
+      setGpsStatus("inactive");
     }
   }, []);
 
@@ -98,13 +96,11 @@ function App() {
     setIsAuthenticated(true);
     localStorage.setItem("currentUser", JSON.stringify(userData));
 
-    // Register user as vehicle and start GPS tracking
-    handleAddVehicle(userData.phoneNumber, userData.vehicleId);
+    // Register user as vehicle (but don't start GPS automatically)
+    handleAddVehicle(userData.phoneNumber, userData.vehicleId, userData.name);
 
-    // Small delay to ensure UI is ready, then start GPS
-    setTimeout(() => {
-      startContinuousGPSTracking(userData);
-    }, 1000);
+    // Set GPS status to inactive so user needs to manually enable it
+    setGpsStatus("inactive");
   };
 
   const handleLogout = () => {
@@ -422,8 +418,8 @@ function App() {
     startTracking();
   };
 
-  const handleAddVehicle = (phoneNumber, vehicleId) => {
-    socket.emit("register-vehicle", { phoneNumber, vehicleId });
+  const handleAddVehicle = (phoneNumber, vehicleId, fullName) => {
+    socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName });
   };
 
   const handleRemoveVehicle = (phoneNumber) => {

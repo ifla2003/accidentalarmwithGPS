@@ -4,7 +4,6 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(255, 0, 0, 0.95);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -13,13 +12,36 @@
   font-weight: bold;
 }
 
-.collision-alert.blinking {
-  animation: blink 0.5s infinite;
+/* Collision alert styling (red) */
+.collision-alert.collision {
+  background-color: rgba(255, 0, 0, 0.95);
 }
 
-@keyframes blink {
+.collision-alert.collision.blinking {
+  animation: blink-collision 0.5s infinite;
+}
+
+@keyframes blink-collision {
   0%, 50% { 
     background-color: rgba(255, 0, 0, 0.95);
+  }
+  51%, 100% { 
+    background-color: rgba(255, 255, 0, 0.95);
+  }
+}
+
+/* Warning alert styling (orange/yellow) */
+.collision-alert.warning {
+  background-color: rgba(255, 165, 0, 0.95);
+}
+
+.collision-alert.warning.blinking {
+  animation: blink-warning 1s infinite;
+}
+
+@keyframes blink-warning {
+  0%, 50% { 
+    background-color: rgba(255, 165, 0, 0.95);
   }
   51%, 100% { 
     background-color: rgba(255, 255, 0, 0.95);
@@ -80,6 +102,12 @@
   text-align: center;
 }
 
+.nearby-vehicle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .vehicle-pair {
   display: flex;
   justify-content: space-between;
@@ -122,12 +150,20 @@
 }
 
 .distance-warning {
-  background: rgba(255, 68, 68, 0.3);
   padding: 15px;
   border-radius: 8px;
   margin: 20px 0;
-  border: 2px solid #ff4444;
   text-align: center;
+}
+
+.distance-warning.collision {
+  background: rgba(255, 68, 68, 0.3);
+  border: 2px solid #ff4444;
+}
+
+.distance-warning.warning {
+  background: rgba(255, 165, 0, 0.3);
+  border: 2px solid #ffa500;
 }
 
 .danger-text {
@@ -149,7 +185,6 @@
 }
 
 .dismiss-btn {
-  background-color: #ff4444;
   color: white;
   border: 3px solid white;
   padding: 15px 30px;
@@ -161,7 +196,43 @@
   transition: all 0.3s ease;
 }
 
-.dismiss-btn:hover {
+.dismiss-btn.collision {
+  background-color: #ff4444;
+}
+
+.dismiss-btn.collision:hover {
   background-color: #ff6666;
   transform: scale(1.05);
+}
+
+.dismiss-btn.warning {
+  background-color: #ffa500;
+}
+
+.dismiss-btn.warning:hover {
+  background-color: #ffb733;
+  transform: scale(1.05);
+}.actio
+n-text {
+  font-size: 16px !important;
+  font-weight: bold !important;
+  margin-top: 10px !important;
+  color: #ffffff !important;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.collision .action-text {
+  color: #ff4444 !important;
+  animation: pulse-text 1s infinite;
+}
+
+.warning .action-text {
+  color: #ffa500 !important;
+}.drive
+r-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffffff;
+  margin: 5px 0;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }

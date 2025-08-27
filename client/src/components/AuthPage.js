@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
-import './AuthPage.css';
+import React, { useState } from "react";
+import "./AuthPage.css";
 
 const AuthPage = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    phoneNumber: '',
-    vehicleId: '',
-    name: '',
-    password: ''
+    phoneNumber: "",
+    vehicleId: "",
+    name: "",
+    password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
@@ -24,93 +24,69 @@ const AuthPage = ({ onLogin }) => {
 
     try {
       if (isLogin) {
-        // Login process
+        // Login process - call server API
         const loginData = {
           phoneNumber: formData.phoneNumber.trim(),
-          password: formData.password
+          password: formData.password,
         };
-        
-        // Simulate login validation (in real app, this would be an API call)
-        const savedUser = localStorage.getItem(`user_${loginData.phoneNumber}`);
-        if (savedUser) {
-          const userData = JSON.parse(savedUser);
-          if (userData.password === loginData.password) {
-            // Start GPS tracking immediately after login
-            startGPSTracking(userData);
-            onLogin(userData);
-          } else {
-            alert('Invalid password!');
+
+        const response = await fetch(
+          "https://vehiclecollisionapp.testatozas.in/api/login",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(loginData),
           }
+        );
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          console.log("Login successful");
+          onLogin(result.user);
         } else {
-          alert('Phone number not registered. Please register first.');
+          alert(result.error || "Login failed");
         }
       } else {
-        // Registration process
-        const userData = {
+        // Registration process - call server API
+        const registrationData = {
           phoneNumber: formData.phoneNumber.trim(),
           vehicleId: formData.vehicleId.trim(),
-          name: formData.name.trim(),
+          fullName: formData.name.trim(),
           password: formData.password,
-          registeredAt: new Date().toISOString()
         };
 
-        // Check if user already exists
-        const existingUser = localStorage.getItem(`user_${userData.phoneNumber}`);
-        if (existingUser) {
-          alert('Phone number already registered. Please login instead.');
-          setIsLogin(true);
-          return;
-        }
+        const response = await fetch(
+          "https://vehiclecollisionapp.testatozas.in/api/register",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(registrationData),
+          }
+        );
 
-        // Save user data (in real app, this would be an API call)
-        localStorage.setItem(`user_${userData.phoneNumber}`, JSON.stringify(userData));
-        
-        // Automatically log in the user after successful registration
-        console.log('Registration successful, logging in automatically...');
-        startGPSTracking(userData);
-        onLogin(userData);
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          console.log("Registration successful, logging in automatically...");
+          onLogin(result.user);
+        } else {
+          alert(result.error || "Registration failed");
+          if (result.error && result.error.includes("already registered")) {
+            setIsLogin(true);
+          }
+        }
       }
     } catch (error) {
-      console.error('Auth error:', error);
-      alert('An error occurred. Please try again.');
+      console.error("Auth error:", error);
+      alert("Network error. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const startGPSTracking = (userData) => {
-    if (!navigator.geolocation) {
-      console.log('GPS not supported, will start tracking after login');
-      return;
-    }
-
-    // Try to get initial location with better error handling
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const locationData = {
-          phoneNumber: userData.phoneNumber,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: new Date().toISOString(),
-          speed: position.coords.speed || 0,
-          heading: position.coords.heading || 0,
-        };
-        
-        console.log(`Initial GPS location for ${userData.name}:`, locationData);
-        localStorage.setItem(`location_${userData.phoneNumber}`, JSON.stringify(locationData));
-      },
-      (error) => {
-        console.error("Initial GPS Error:", error);
-        // Don't show alert here, let the main app handle GPS tracking
-        console.log('Initial GPS failed, main app will handle continuous tracking');
-      },
-      { 
-        enableHighAccuracy: false, // Less strict for initial attempt
-        maximumAge: 30000, // Allow cached location
-        timeout: 20000 // Reasonable timeout
-      }
-    );
   };
 
   return (
@@ -122,14 +98,14 @@ const AuthPage = ({ onLogin }) => {
         </div>
 
         <div className="auth-tabs">
-          <button 
-            className={`tab-btn ${isLogin ? 'active' : ''}`}
+          <button
+            className={`tab-btn ${isLogin ? "active" : ""}`}
             onClick={() => setIsLogin(true)}
           >
             Login
           </button>
-          <button 
-            className={`tab-btn ${!isLogin ? 'active' : ''}`}
+          <button
+            className={`tab-btn ${!isLogin ? "active" : ""}`}
             onClick={() => setIsLogin(false)}
           >
             Register
@@ -188,12 +164,8 @@ const AuthPage = ({ onLogin }) => {
             />
           </div>
 
-          <button 
-            type="submit" 
-            className="auth-btn"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Processing...' : (isLogin ? 'Login' : 'Register')}
+          <button type="submit" className="auth-btn" disabled={isLoading}>
+            {isLoading ? "Processing..." : isLogin ? "Login" : "Register"}
           </button>
         </form>
 

@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const { getDistance } = require("geolib");
 require("dotenv").config();
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -32,6 +33,9 @@ mongoose.connect(
 const vehicleSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true, unique: true },
   vehicleId: { type: String, required: true },
+  fullName: { type: String, required: true },
+  password: { type: String, required: true },
+  registeredAt: { type: Date, default: Date.now },
   currentLocation: {
     latitude: Number,
     longitude: Number,
@@ -51,26 +55,37 @@ const Vehicle = mongoose.model("Vehicle", vehicleSchema);
 // Store active connections
 const activeConnections = new Map();
 
+// Serve static files from the React frontend build
+app.use(express.static(path.join(__dirname, "build")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "build"));
+});
+
 // Socket connection handling
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
   socket.on("register-vehicle", async (data) => {
-    const { phoneNumber, vehicleId } = data;
-    activeConnections.set(socket.id, { phoneNumber, vehicleId });
+    const { phoneNumber, vehicleId, fullName } = data;
+    activeConnections.set(socket.id, { phoneNumber, vehicleId, fullName });
 
-    // Update or create vehicle in database
+    // Update existing vehicle (don't create new ones here, only update existing registered users)
     const vehicle = await Vehicle.findOneAndUpdate(
       { phoneNumber },
-      { vehicleId, isActive: true, locationTrackingEnabled: true },
-      { upsert: true, new: true }
+      { isActive: true, locationTrackingEnabled: false },
+      { new: true }
     );
 
-    // Send updated vehicle list to all clients
-    const allVehicles = await Vehicle.find({ isActive: true });
-    io.emit("vehicles-update", allVehicles);
+    if (vehicle) {
+      // Send updated vehicle list to all clients
+      const allVehicles = await Vehicle.find({ isActive: true });
+      io.emit("vehicles-update", allVehicles);
 
-    socket.emit("registration-success", { phoneNumber, vehicleId });
+      socket.emit("registration-success", { phoneNumber, vehicleId, fullName });
+    } else {
+      socket.emit("registration-error", { error: "User not found. Please register first." });
+    }
   });
 
   socket.on("remove-vehicle", async (data) => {
@@ -262,7 +277,8 @@ io.on("connection", (socket) => {
 
 // Collision detection function
 async function checkCollisionRisk(currentVehicle, io) {
-  const DANGER_DISTANCE = 7; // 7 meter threshold
+  const COLLISION_DISTANCE = 7; // 7 meter collision threshold
+  const WARNING_DISTANCE = 10; // 10 meter warning threshold
 
   try {
     // Only check collision if current vehicle has valid location data
@@ -298,6 +314,11 @@ async function checkCollisionRisk(currentVehicle, io) {
       `Checking collision for ${currentVehicle.vehicleId} against ${allVehicles.length} other vehicles with location data`
     );
 
+    // Find the socket connection for the current vehicle user
+    const currentUserSocket = findSocketByPhoneNumber(
+      currentVehicle.phoneNumber
+    );
+
     for (const otherVehicle of allVehicles) {
       // Double-check that location data is valid
       if (
@@ -317,28 +338,19 @@ async function checkCollisionRisk(currentVehicle, io) {
 
         // Log coordinates and distance calculation for debugging
         console.log(
-          `Vehicle ${currentVehicle.vehicleId} at: ${currentVehicle.currentLocation.latitude}, ${currentVehicle.currentLocation.longitude}`
-        );
-        console.log(
-          `Vehicle ${otherVehicle.vehicleId} at: ${otherVehicle.currentLocation.latitude}, ${otherVehicle.currentLocation.longitude}`
-        );
-        console.log(
           `Distance between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}: ${distance} meters`
         );
 
-        // Check if distance is within danger threshold
-        if (distance <= DANGER_DISTANCE) {
-          const alertData = {
-            type: "COLLISION_WARNING",
+        // Check if distance is within collision threshold (7m)
+        if (distance <= COLLISION_DISTANCE) {
+          const collisionAlertData = {
+            type: "COLLISION_ALERT",
+            alertLevel: "COLLISION",
             distance: distance,
-            vehicle1: {
-              phoneNumber: currentVehicle.phoneNumber,
-              vehicleId: currentVehicle.vehicleId,
-              location: currentVehicle.currentLocation,
-            },
-            vehicle2: {
+            nearbyVehicle: {
               phoneNumber: otherVehicle.phoneNumber,
               vehicleId: otherVehicle.vehicleId,
+              fullName: otherVehicle.fullName,
               location: otherVehicle.currentLocation,
             },
             timestamp: new Date(),
@@ -348,14 +360,90 @@ async function checkCollisionRisk(currentVehicle, io) {
             `🚨 COLLISION ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
           );
 
-          // Send alert to all clients (broadcast collision warning)
-          io.emit("collision-alert", alertData);
+          // Send collision alert only to the current vehicle user
+          if (currentUserSocket) {
+            currentUserSocket.emit("collision-alert", collisionAlertData);
+          }
+
+          // Also check if the other vehicle user should be warned
+          const otherUserSocket = findSocketByPhoneNumber(
+            otherVehicle.phoneNumber
+          );
+          if (otherUserSocket) {
+            const otherVehicleAlertData = {
+              type: "COLLISION_ALERT",
+              alertLevel: "COLLISION",
+              distance: distance,
+              nearbyVehicle: {
+                phoneNumber: currentVehicle.phoneNumber,
+                vehicleId: currentVehicle.vehicleId,
+                fullName: currentVehicle.fullName,
+                location: currentVehicle.currentLocation,
+              },
+              timestamp: new Date(),
+            };
+            otherUserSocket.emit("collision-alert", otherVehicleAlertData);
+          }
+        }
+        // Check if distance is within warning threshold (10m) but not collision
+        else if (distance <= WARNING_DISTANCE) {
+          const warningAlertData = {
+            type: "WARNING_ALERT",
+            alertLevel: "WARNING",
+            distance: distance,
+            nearbyVehicle: {
+              phoneNumber: otherVehicle.phoneNumber,
+              vehicleId: otherVehicle.vehicleId,
+              fullName: otherVehicle.fullName,
+              location: otherVehicle.currentLocation,
+            },
+            timestamp: new Date(),
+          };
+
+          console.log(
+            `⚠️ WARNING ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
+          );
+
+          // Send warning alert only to the current vehicle user
+          if (currentUserSocket) {
+            currentUserSocket.emit("collision-alert", warningAlertData);
+          }
+
+          // Also check if the other vehicle user should be warned
+          const otherUserSocket = findSocketByPhoneNumber(
+            otherVehicle.phoneNumber
+          );
+          if (otherUserSocket) {
+            const otherVehicleWarningData = {
+              type: "WARNING_ALERT",
+              alertLevel: "WARNING",
+              distance: distance,
+              nearbyVehicle: {
+                phoneNumber: currentVehicle.phoneNumber,
+                vehicleId: currentVehicle.vehicleId,
+                fullName: currentVehicle.fullName,
+                location: currentVehicle.currentLocation,
+              },
+              timestamp: new Date(),
+            };
+            otherUserSocket.emit("collision-alert", otherVehicleWarningData);
+          }
         }
       }
     }
   } catch (error) {
     console.error("Collision check error:", error);
   }
+}
+
+// Helper function to find socket by phone number
+function findSocketByPhoneNumber(phoneNumber) {
+  for (const [socketId, userData] of activeConnections.entries()) {
+    if (userData.phoneNumber === phoneNumber) {
+      return io.sockets.sockets.get(socketId);
+    }
+  }
+  return null;
 }
 
 // REST API endpoints
@@ -390,6 +478,87 @@ app.post("/api/vehicles", async (req, res) => {
     res.status(201).json(vehicle);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Authentication endpoints
+app.post("/api/register", async (req, res) => {
+  try {
+    const { phoneNumber, vehicleId, fullName, password } = req.body;
+
+    // Check if user already exists
+    const existingUser = await Vehicle.findOne({ phoneNumber });
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: "Phone number already registered. Please login instead." 
+      });
+    }
+
+    // Create new user
+    const newUser = new Vehicle({
+      phoneNumber,
+      vehicleId,
+      fullName,
+      password,
+      isActive: true,
+      isDriving: true,
+      locationTrackingEnabled: false,
+    });
+
+    await newUser.save();
+
+    // Return user data without password
+    const userData = {
+      phoneNumber: newUser.phoneNumber,
+      vehicleId: newUser.vehicleId,
+      name: newUser.fullName,
+      registeredAt: newUser.registeredAt,
+    };
+
+    res.status(201).json({ 
+      success: true, 
+      message: "Registration successful", 
+      user: userData 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/login", async (req, res) => {
+  try {
+    const { phoneNumber, password } = req.body;
+
+    // Find user by phone number
+    const user = await Vehicle.findOne({ phoneNumber });
+    if (!user) {
+      return res.status(400).json({ 
+        error: "Phone number not registered. Please register first." 
+      });
+    }
+
+    // Check password
+    if (user.password !== password) {
+      return res.status(400).json({ 
+        error: "Invalid password!" 
+      });
+    }
+
+    // Return user data without password
+    const userData = {
+      phoneNumber: user.phoneNumber,
+      vehicleId: user.vehicleId,
+      name: user.fullName,
+      registeredAt: user.registeredAt,
+    };
+
+    res.json({ 
+      success: true, 
+      message: "Login successful", 
+      user: userData 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

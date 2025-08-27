@@ -83,6 +83,7 @@ const RegisteredVehicles = ({ vehicles, onRemoveVehicle, onToggleDriving }) => {
                       {status}
                     </div>
                   </div>
+                  <div className="driver-name">👤 {vehicle.fullName || 'Unknown Driver'}</div>
                   <div className="vehicle-phone">{vehicle.phoneNumber}</div>
                   {vehicle.currentLocation && 
                    vehicle.currentLocation.latitude != null && 

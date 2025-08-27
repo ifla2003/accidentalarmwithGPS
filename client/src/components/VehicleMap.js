@@ -224,6 +224,7 @@ const VehicleMap = ({ vehicles }) => {
           >
             <div className="tooltip-content">
               <h4>🚗 {hoveredVehicle.vehicleId}</h4>
+              <p><strong>Driver:</strong> {hoveredVehicle.fullName || 'Unknown'}</p>
               <p><strong>Phone:</strong> {hoveredVehicle.phoneNumber}</p>
               <p><strong>Status:</strong> {getVehicleStatus(hoveredVehicle).status.toUpperCase()}</p>
               <p><strong>GPS:</strong> {hoveredVehicle.currentLocation.latitude?.toFixed(6) || 'N/A'}, {hoveredVehicle.currentLocation.longitude?.toFixed(6) || 'N/A'}</p>
