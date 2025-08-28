@@ -6,8 +6,8 @@ import MapDemo from "./components/MapDemo";
 import AuthPage from "./components/AuthPage";
 import "./App.css";
 
-//const socket = io("https://vehiclecollisionapp.testatozas.in");
-const socket = io("https://vehiclecollisionapp.testatozas.in");
+//const socket = io("http://localhost:5000");
+const socket = io("http://localhost:5000");
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -531,7 +531,7 @@ function App() {
               </div>
             </div>
             <div className="header-buttons">
-              {gpsStatus === "inactive" || gpsStatus === "error" ? (
+              {/* {gpsStatus === "inactive" || gpsStatus === "error" ? (
                 <>
                   <button
                     onClick={() => startContinuousGPSTracking(currentUser)}
@@ -546,7 +546,7 @@ function App() {
                     Use Demo Location
                   </button>
                 </>
-              ) : null}
+              ) : null} */}
               <button onClick={handleLogout} className="logout-btn">
                 Logout
               </button>

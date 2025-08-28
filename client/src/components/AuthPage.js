@@ -30,16 +30,13 @@ const AuthPage = ({ onLogin }) => {
           password: formData.password,
         };
 
-        const response = await fetch(
-          "https://vehiclecollisionapp.testatozas.in/api/login",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(loginData),
-          }
-        );
+        const response = await fetch("http://localhost:5000/api/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(loginData),
+        });
 
         const result = await response.json();
 
@@ -58,16 +55,13 @@ const AuthPage = ({ onLogin }) => {
           password: formData.password,
         };
 
-        const response = await fetch(
-          "https://vehiclecollisionapp.testatozas.in/api/register",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(registrationData),
-          }
-        );
+        const response = await fetch("http://localhost:5000/api/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(registrationData),
+        });
 
         const result = await response.json();
 

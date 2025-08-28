@@ -73,7 +73,7 @@ const RegisteredVehicles = ({ vehicles, onRemoveVehicle, onToggleDriving }) => {
             
             return (
               <div key={vehicle.phoneNumber} className={`vehicle-item ${isDriving ? 'driving' : 'stopped'}`}>
-                <div className="vehicle-info">
+                <div className="registred-vehicle-info">
                   <div className="vehicle-header">
                     <div className="vehicle-id">{vehicle.vehicleId}</div>
                     <div 
