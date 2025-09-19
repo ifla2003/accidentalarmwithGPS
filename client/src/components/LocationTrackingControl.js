@@ -10,6 +10,7 @@ const LocationTrackingControl = ({
   onStartSimulated,
   onAddVehicle,
   onUpdateUser,
+  onStopGPS,
 }) => {
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +27,12 @@ const LocationTrackingControl = ({
   );
 
   useEffect(() => {
+    if (currentVehicle) {
+      setIsLocationEnabled(currentVehicle.locationTrackingEnabled || false);
+    }
+  }, [currentVehicle]);
+
+  useEffect(() => {
     // Check if details are already saved
     if (currentUser && currentUser.name && currentUser.phoneNumber && currentUser.vehicleId) {
       setIsDetailsSaved(true);
@@ -33,13 +40,6 @@ const LocationTrackingControl = ({
       setIsDetailsSaved(false);
     }
   }, [currentUser]);
-
-  // Load location tracking status from vehicles data
-  useEffect(() => {
-    if (currentVehicle) {
-      setIsLocationEnabled(currentVehicle.locationTrackingEnabled || false);
-    }
-  }, [currentVehicle]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -57,14 +57,18 @@ const LocationTrackingControl = ({
 
     try {
       // Add vehicle to database
-      await onAddVehicle(userDetails.phoneNumber, userDetails.vehicleId, userDetails.name);
+      const result = await onAddVehicle(userDetails.phoneNumber, userDetails.vehicleId, userDetails.name);
       
-      // Update current user state
-      onUpdateUser({
-        name: userDetails.name,
-        phoneNumber: userDetails.phoneNumber,
-        vehicleId: userDetails.vehicleId
-      });
+      // Update current user state with data from server
+      if (result.user) {
+        onUpdateUser(result.user);
+      } else {
+        onUpdateUser({
+          name: userDetails.name,
+          phoneNumber: userDetails.phoneNumber,
+          vehicleId: userDetails.vehicleId
+        });
+      }
       
       // Store phone number in sessionStorage for future reference
       sessionStorage.setItem("userPhone", userDetails.phoneNumber);
@@ -88,19 +92,19 @@ const LocationTrackingControl = ({
       // Update the server
       await onToggleLocationTracking(currentUser.phoneNumber, newState);
 
-      // Update local state immediately
-      setIsLocationEnabled(newState);
-
       if (newState) {
         // If enabling location tracking, start GPS
         if (gpsStatus === "inactive" || gpsStatus === "error") {
           onStartGPS();
         }
+      } else {
+        // If disabling location tracking, stop GPS
+        onStopGPS();
       }
+
+      setIsLocationEnabled(newState);
     } catch (error) {
       console.error("Failed to toggle location tracking:", error);
-      // Revert state on error
-      setIsLocationEnabled(!isLocationEnabled);
     } finally {
       setIsLoading(false);
     }

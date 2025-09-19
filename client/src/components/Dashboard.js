@@ -22,6 +22,7 @@ const Dashboard = ({
   onStartGPS,
   onStartSimulated,
   onUpdateUser,
+  onStopGPS,
 }) => {
   return (
     <div className="dashboard">
@@ -35,6 +36,7 @@ const Dashboard = ({
           onStartSimulated={onStartSimulated}
           onAddVehicle={onAddVehicle}
           onUpdateUser={onUpdateUser}
+          onStopGPS={onStopGPS}
         />
       </div>
 

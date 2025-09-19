@@ -76,7 +76,7 @@ function App() {
   // Check if user is already registered in database
   useEffect(() => {
     const checkExistingUser = async () => {
-      // Try to get user from a stored phone number (you can store this in sessionStorage temporarily)
+      // Try to get user from a stored phone number
       const storedPhone = sessionStorage.getItem("userPhone");
       if (storedPhone) {
         try {
@@ -85,22 +85,18 @@ function App() {
             const result = await response.json();
             if (result.success) {
               setCurrentUser(result.user);
-              // Auto-register the user as a vehicle
-              handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name);
-              
-              // Load location tracking status from database
-              const vehiclesResponse = await fetch(`https://vehiclecollisionapp.testatozas.in/api/vehicles`);
-              if (vehiclesResponse.ok) {
-                const vehicles = await vehiclesResponse.json();
-                const userVehicle = vehicles.find(v => v.phoneNumber === result.user.phoneNumber);
-                if (userVehicle && userVehicle.locationTrackingEnabled) {
-                  setGpsStatus("inactive"); // Set to inactive so user can enable GPS
-                }
-              }
+              // Auto-register the user as a vehicle (but don't wait for response)
+              handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name)
+                .catch(error => console.error("Auto-registration failed:", error));
             }
+          } else {
+            // User not found in database, clear session storage
+            sessionStorage.removeItem("userPhone");
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
+          // Clear session storage on error
+          sessionStorage.removeItem("userPhone");
         }
       }
     };
@@ -413,11 +409,60 @@ function App() {
   };
 
   const handleAddVehicle = (phoneNumber, vehicleId, fullName) => {
-    socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName });
+    return new Promise((resolve, reject) => {
+      socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName });
+      
+      // Listen for registration success
+      const handleSuccess = (data) => {
+        socket.off("registration-success", handleSuccess);
+        socket.off("registration-error", handleError);
+        resolve(data);
+      };
+      
+      const handleError = (error) => {
+        socket.off("registration-success", handleSuccess);
+        socket.off("registration-error", handleError);
+        reject(new Error(error.error || "Registration failed"));
+      };
+      
+      socket.on("registration-success", handleSuccess);
+      socket.on("registration-error", handleError);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        socket.off("registration-success", handleSuccess);
+        socket.off("registration-error", handleError);
+        reject(new Error("Registration timeout"));
+      }, 10000);
+    });
   };
 
   const handleUpdateUser = (userData) => {
     setCurrentUser(userData);
+  };
+
+  const stopGPSTracking = () => {
+    console.log("Stopping GPS tracking...");
+    
+    // Clear GPS watch if it exists
+    const existingWatchId = localStorage.getItem("gpsWatchId");
+    if (existingWatchId) {
+      console.log("Clearing GPS watch...");
+      navigator.geolocation.clearWatch(parseInt(existingWatchId));
+      localStorage.removeItem("gpsWatchId");
+    }
+    
+    // Clear simulation interval if it exists
+    const simulationInterval = localStorage.getItem("simulationInterval");
+    if (simulationInterval) {
+      console.log("Clearing simulation interval...");
+      clearInterval(parseInt(simulationInterval));
+      localStorage.removeItem("simulationInterval");
+    }
+    
+    // Set GPS status to inactive
+    setGpsStatus("inactive");
+    console.log("GPS tracking stopped");
   };
 
   const handleRemoveVehicle = (phoneNumber) => {
@@ -561,6 +606,7 @@ function App() {
           onStartGPS={() => startContinuousGPSTracking(currentUser)}
           onStartSimulated={() => startSimulatedLocationDirect(currentUser)}
           onUpdateUser={handleUpdateUser}
+          onStopGPS={stopGPSTracking}
         />
 
         {collisionAlert && (
