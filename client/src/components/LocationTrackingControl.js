@@ -8,9 +8,17 @@ const LocationTrackingControl = ({
   gpsStatus,
   onStartGPS,
   onStartSimulated,
+  onAddVehicle,
+  onUpdateUser,
 }) => {
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [userDetails, setUserDetails] = useState({
+    name: '',
+    phoneNumber: '',
+    vehicleId: ''
+  });
+  const [isDetailsSaved, setIsDetailsSaved] = useState(false);
 
   // Find current user's vehicle data
   const currentVehicle = vehicles.find(
@@ -18,10 +26,56 @@ const LocationTrackingControl = ({
   );
 
   useEffect(() => {
+    // Check if details are already saved
+    if (currentUser && currentUser.name && currentUser.phoneNumber && currentUser.vehicleId) {
+      setIsDetailsSaved(true);
+    } else {
+      setIsDetailsSaved(false);
+    }
+  }, [currentUser]);
+
+  // Load location tracking status from vehicles data
+  useEffect(() => {
     if (currentVehicle) {
       setIsLocationEnabled(currentVehicle.locationTrackingEnabled || false);
     }
   }, [currentVehicle]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setUserDetails(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAddDetails = async () => {
+    if (!userDetails.name.trim() || !userDetails.phoneNumber.trim() || !userDetails.vehicleId.trim()) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    try {
+      // Add vehicle to database
+      await onAddVehicle(userDetails.phoneNumber, userDetails.vehicleId, userDetails.name);
+      
+      // Update current user state
+      onUpdateUser({
+        name: userDetails.name,
+        phoneNumber: userDetails.phoneNumber,
+        vehicleId: userDetails.vehicleId
+      });
+      
+      // Store phone number in sessionStorage for future reference
+      sessionStorage.setItem("userPhone", userDetails.phoneNumber);
+      
+      setIsDetailsSaved(true);
+      alert('Details saved successfully!');
+    } catch (error) {
+      console.error('Failed to save details:', error);
+      alert('Failed to save details. Please try again.');
+    }
+  };
 
   const handleToggleLocationTracking = async () => {
     if (!currentUser) return;
@@ -34,16 +88,19 @@ const LocationTrackingControl = ({
       // Update the server
       await onToggleLocationTracking(currentUser.phoneNumber, newState);
 
+      // Update local state immediately
+      setIsLocationEnabled(newState);
+
       if (newState) {
         // If enabling location tracking, start GPS
         if (gpsStatus === "inactive" || gpsStatus === "error") {
           onStartGPS();
         }
       }
-
-      setIsLocationEnabled(newState);
     } catch (error) {
       console.error("Failed to toggle location tracking:", error);
+      // Revert state on error
+      setIsLocationEnabled(!isLocationEnabled);
     } finally {
       setIsLoading(false);
     }
@@ -93,9 +150,7 @@ const LocationTrackingControl = ({
     }
   };
 
-  if (!currentUser) {
-    return null;
-  }
+  // Always show the component, even if no user is set yet
 
   return (
     <div className="location-tracking-control">
@@ -108,53 +163,104 @@ const LocationTrackingControl = ({
       </div>
 
       <div className="control-content">
-        <div className="vehicle-info">
-          <p>
-            <strong>Your Vehicle:</strong> {currentUser.vehicleId}
-          </p>
-          <p>
-            <strong>Phone:</strong> {currentUser.phoneNumber}
-          </p>
-        </div>
+        {!isDetailsSaved ? (
+          <div className="user-details-form">
+            <h4>📝 Add Your Details</h4>
+            <div className="form-group">
+              <label>Full Name:</label>
+              <input
+                type="text"
+                name="name"
+                value={userDetails.name}
+                onChange={handleInputChange}
+                placeholder="Enter your full name"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Phone Number:</label>
+              <input
+                type="tel"
+                name="phoneNumber"
+                value={userDetails.phoneNumber}
+                onChange={handleInputChange}
+                placeholder="Enter your phone number"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Vehicle ID:</label>
+              <input
+                type="text"
+                name="vehicleId"
+                value={userDetails.vehicleId}
+                onChange={handleInputChange}
+                placeholder="Enter your vehicle ID (e.g., CAR01)"
+                required
+              />
+            </div>
+            <button
+              onClick={handleAddDetails}
+              className="add-details-btn"
+            >
+              💾 Add Details
+            </button>
+          </div>
+        ) : (
+          <div className="vehicle-info">
+            <h4>✅ Your Details</h4>
+            <p>
+              <strong>Name:</strong> {currentUser.name}
+            </p>
+            <p>
+              <strong>Vehicle ID:</strong> {currentUser.vehicleId}
+            </p>
+            <p>
+              <strong>Phone:</strong> {currentUser.phoneNumber}
+            </p>
+          </div>
+        )}
 
-        <div className="control-buttons">
-          <button
-            onClick={handleToggleLocationTracking}
-            disabled={isLoading}
-            className={`toggle-btn ${
-              isLocationEnabled ? "enabled" : "disabled"
-            }`}
-          >
-            {isLoading ? (
-              <span className="loading">⏳ Updating...</span>
-            ) : (
-              <>
-                {isLocationEnabled ? "🛑 Disable" : "📍 Enable"} Location
-                Tracking
-              </>
-            )}
-          </button>
+        {isDetailsSaved && (
+          <div className="control-buttons">
+            <button
+              onClick={handleToggleLocationTracking}
+              disabled={isLoading}
+              className={`toggle-btn ${
+                isLocationEnabled ? "enabled" : "disabled"
+              }`}
+            >
+              {isLoading ? (
+                <span className="loading">⏳ Updating...</span>
+              ) : (
+                <>
+                  {isLocationEnabled ? "🛑 Disable" : "📍 Enable"} Location
+                  Tracking
+                </>
+              )}
+            </button>
 
-          {isLocationEnabled &&
-            (gpsStatus === "inactive" || gpsStatus === "error") && (
-              <div className="gps-controls">
-                <button
-                  onClick={onStartGPS}
-                  className="gps-btn"
-                  disabled={gpsStatus === "searching"}
-                >
-                  {gpsStatus === "searching"
-                    ? "🔍 Getting GPS..."
-                    : "📡 Start GPS"}
-                </button>
-                <button onClick={onStartSimulated} className="sim-btn">
-                  📍 Use Demo Location
-                </button>
-              </div>
-            )}
-        </div>
+            {isLocationEnabled &&
+              (gpsStatus === "inactive" || gpsStatus === "error") && (
+                <div className="gps-controls">
+                  <button
+                    onClick={onStartGPS}
+                    className="gps-btn"
+                    disabled={gpsStatus === "searching"}
+                  >
+                    {gpsStatus === "searching"
+                      ? "🔍 Getting GPS..."
+                      : "📡 Start GPS"}
+                  </button>
+                  <button onClick={onStartSimulated} className="sim-btn">
+                    📍 Use Demo Location
+                  </button>
+                </div>
+              )}
+          </div>
+        )}
 
-        {isLocationEnabled && currentVehicle?.currentLocation && (
+        {isDetailsSaved && isLocationEnabled && currentVehicle?.currentLocation && (
           <div className="current-location">
             <h4>Current Location</h4>
             <div className="location-details">
@@ -183,17 +289,19 @@ const LocationTrackingControl = ({
           </div>
         )}
 
-        <div className="tracking-info">
-          <h4>ℹ️ About Location Tracking</h4>
-          <ul>
-            <li>Enable location tracking to appear on the vehicle map</li>
-            <li>
-              Your location is shared with other users for collision detection
-            </li>
-            <li>Location data is updated in real-time when GPS is active</li>
-            <li>You can disable tracking at any time</li>
-          </ul>
-        </div>
+        {isDetailsSaved && (
+          <div className="tracking-info">
+            <h4>ℹ️ About Location Tracking</h4>
+            <ul>
+              <li>Enable location tracking to appear on the vehicle map</li>
+              <li>
+                Your location is shared with other users for collision detection
+              </li>
+              <li>Location data is updated in real-time when GPS is active</li>
+              <li>You can disable tracking at any time</li>
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

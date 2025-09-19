@@ -3,11 +3,10 @@ import io from "socket.io-client";
 import CollisionAlert from "./components/CollisionAlert";
 import Dashboard from "./components/Dashboard";
 import MapDemo from "./components/MapDemo";
-import AuthPage from "./components/AuthPage";
 import "./App.css";
 
 //const socket = io("http://localhost:5000");
-const socket = io("http://localhost:5000");
+const socket = io("https://vehiclecollisionapp.testatozas.in");
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -15,7 +14,6 @@ function App() {
   const [collisionAlert, setCollisionAlert] = useState(null);
   const [demoMode, setDemoMode] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gpsStatus, setGpsStatus] = useState("inactive"); // inactive, searching, active, error
   const [systemStatus, setSystemStatus] = useState({
     monitoring: "Active",
@@ -75,44 +73,40 @@ function App() {
     };
   }, []);
 
-  // Separate useEffect for checking saved user
+  // Check if user is already registered in database
   useEffect(() => {
-    const savedUser = localStorage.getItem("currentUser");
-    if (savedUser) {
-      const userData = JSON.parse(savedUser);
-      setCurrentUser(userData);
-      setIsAuthenticated(true);
+    const checkExistingUser = async () => {
+      // Try to get user from a stored phone number (you can store this in sessionStorage temporarily)
+      const storedPhone = sessionStorage.getItem("userPhone");
+      if (storedPhone) {
+        try {
+          const response = await fetch(`https://vehiclecollisionapp.testatozas.in/api/user/${storedPhone}`);
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+              setCurrentUser(result.user);
+              // Auto-register the user as a vehicle
+              handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name);
+              
+              // Load location tracking status from database
+              const vehiclesResponse = await fetch(`https://vehiclecollisionapp.testatozas.in/api/vehicles`);
+              if (vehiclesResponse.ok) {
+                const vehicles = await vehiclesResponse.json();
+                const userVehicle = vehicles.find(v => v.phoneNumber === result.user.phoneNumber);
+                if (userVehicle && userVehicle.locationTrackingEnabled) {
+                  setGpsStatus("inactive"); // Set to inactive so user can enable GPS
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch user data:", error);
+        }
+      }
+    };
 
-      // Auto-register the user as a vehicle (but don't start GPS automatically)
-      handleAddVehicle(userData.phoneNumber, userData.vehicleId, userData.name);
-
-      // Set GPS status to inactive so user needs to manually enable it
-      setGpsStatus("inactive");
-    }
+    checkExistingUser();
   }, []);
-
-  const handleLogin = (userData) => {
-    setCurrentUser(userData);
-    setIsAuthenticated(true);
-    localStorage.setItem("currentUser", JSON.stringify(userData));
-
-    // Register user as vehicle (but don't start GPS automatically)
-    handleAddVehicle(userData.phoneNumber, userData.vehicleId, userData.name);
-
-    // Set GPS status to inactive so user needs to manually enable it
-    setGpsStatus("inactive");
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setIsAuthenticated(false);
-    localStorage.removeItem("currentUser");
-
-    // Remove user's vehicle from system
-    if (currentUser) {
-      handleRemoveVehicle(currentUser.phoneNumber);
-    }
-  };
 
   const startSimulatedLocationDirect = (userData) => {
     console.log(`Using simulated location for ${userData.name} (direct)`);
@@ -422,6 +416,10 @@ function App() {
     socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName });
   };
 
+  const handleUpdateUser = (userData) => {
+    setCurrentUser(userData);
+  };
+
   const handleRemoveVehicle = (phoneNumber) => {
     socket.emit("remove-vehicle", { phoneNumber });
   };
@@ -472,10 +470,6 @@ function App() {
     setCollisionAlert(null);
   };
 
-  // Show authentication page if not logged in
-  if (!isAuthenticated) {
-    return <AuthPage onLogin={handleLogin} />;
-  }
 
   if (demoMode) {
     return (
@@ -547,9 +541,6 @@ function App() {
                   </button>
                 </>
               ) : null} */}
-              <button onClick={handleLogout} className="logout-btn">
-                Logout
-              </button>
             </div>
           </div>
         </div>
@@ -569,6 +560,7 @@ function App() {
           gpsStatus={gpsStatus}
           onStartGPS={() => startContinuousGPSTracking(currentUser)}
           onStartSimulated={() => startSimulatedLocationDirect(currentUser)}
+          onUpdateUser={handleUpdateUser}
         />
 
         {collisionAlert && (

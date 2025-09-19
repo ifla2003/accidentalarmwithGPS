@@ -34,7 +34,6 @@ const vehicleSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true, unique: true },
   vehicleId: { type: String, required: true },
   fullName: { type: String, required: true },
-  password: { type: String, required: true },
   registeredAt: { type: Date, default: Date.now },
   currentLocation: {
     latitude: Number,
@@ -70,21 +69,51 @@ io.on("connection", (socket) => {
     const { phoneNumber, vehicleId, fullName } = data;
     activeConnections.set(socket.id, { phoneNumber, vehicleId, fullName });
 
-    // Update existing vehicle (don't create new ones here, only update existing registered users)
-    const vehicle = await Vehicle.findOneAndUpdate(
-      { phoneNumber },
-      { isActive: true, locationTrackingEnabled: false },
-      { new: true }
-    );
+    try {
+      // Check if vehicle already exists
+      let vehicle = await Vehicle.findOne({ phoneNumber });
+      
+      if (vehicle) {
+        // Update existing vehicle
+        vehicle = await Vehicle.findOneAndUpdate(
+          { phoneNumber },
+          { isActive: true, locationTrackingEnabled: false },
+          { new: true }
+        );
+      } else {
+        // Create new vehicle
+        vehicle = new Vehicle({
+          phoneNumber,
+          vehicleId,
+          fullName,
+          isActive: true,
+          isDriving: true,
+          locationTrackingEnabled: false,
+        });
+        await vehicle.save();
+      }
 
-    if (vehicle) {
       // Send updated vehicle list to all clients
       const allVehicles = await Vehicle.find({ isActive: true });
       io.emit("vehicles-update", allVehicles);
 
-      socket.emit("registration-success", { phoneNumber, vehicleId, fullName });
-    } else {
-      socket.emit("registration-error", { error: "User not found. Please register first." });
+      // Return user data
+      const userData = {
+        phoneNumber: vehicle.phoneNumber,
+        vehicleId: vehicle.vehicleId,
+        name: vehicle.fullName,
+        registeredAt: vehicle.registeredAt,
+      };
+
+      socket.emit("registration-success", { 
+        phoneNumber, 
+        vehicleId, 
+        fullName,
+        user: userData 
+      });
+    } catch (error) {
+      console.error("Register vehicle error:", error);
+      socket.emit("registration-error", { error: "Failed to register vehicle." });
     }
   });
 
@@ -360,12 +389,12 @@ async function checkCollisionRisk(currentVehicle, io) {
             `🚨 COLLISION ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
           );
 
-          // Send collision alert only to the current vehicle user
+          // Send collision alert to the current vehicle user
           if (currentUserSocket) {
             currentUserSocket.emit("collision-alert", collisionAlertData);
           }
 
-          // Also check if the other vehicle user should be warned
+          // Also send alert to the other vehicle user
           const otherUserSocket = findSocketByPhoneNumber(
             otherVehicle.phoneNumber
           );
@@ -404,12 +433,12 @@ async function checkCollisionRisk(currentVehicle, io) {
             `⚠️ WARNING ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
           );
 
-          // Send warning alert only to the current vehicle user
+          // Send warning alert to the current vehicle user
           if (currentUserSocket) {
             currentUserSocket.emit("collision-alert", warningAlertData);
           }
 
-          // Also check if the other vehicle user should be warned
+          // Also send warning alert to the other vehicle user
           const otherUserSocket = findSocketByPhoneNumber(
             otherVehicle.phoneNumber
           );
@@ -471,6 +500,30 @@ app.get("/api/all-users", async (req, res) => {
   }
 });
 
+// Get user details by phone number
+app.get("/api/user/:phoneNumber", async (req, res) => {
+  try {
+    const { phoneNumber } = req.params;
+    const user = await Vehicle.findOne({ phoneNumber });
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Return user data without sensitive information
+    const userData = {
+      phoneNumber: user.phoneNumber,
+      vehicleId: user.vehicleId,
+      name: user.fullName,
+      registeredAt: user.registeredAt,
+    };
+
+    res.json({ success: true, user: userData });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/api/vehicles", async (req, res) => {
   try {
     const vehicle = new Vehicle(req.body);
@@ -481,86 +534,6 @@ app.post("/api/vehicles", async (req, res) => {
   }
 });
 
-// Authentication endpoints
-app.post("/api/register", async (req, res) => {
-  try {
-    const { phoneNumber, vehicleId, fullName, password } = req.body;
-
-    // Check if user already exists
-    const existingUser = await Vehicle.findOne({ phoneNumber });
-    if (existingUser) {
-      return res.status(400).json({ 
-        error: "Phone number already registered. Please login instead." 
-      });
-    }
-
-    // Create new user
-    const newUser = new Vehicle({
-      phoneNumber,
-      vehicleId,
-      fullName,
-      password,
-      isActive: true,
-      isDriving: true,
-      locationTrackingEnabled: false,
-    });
-
-    await newUser.save();
-
-    // Return user data without password
-    const userData = {
-      phoneNumber: newUser.phoneNumber,
-      vehicleId: newUser.vehicleId,
-      name: newUser.fullName,
-      registeredAt: newUser.registeredAt,
-    };
-
-    res.status(201).json({ 
-      success: true, 
-      message: "Registration successful", 
-      user: userData 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/login", async (req, res) => {
-  try {
-    const { phoneNumber, password } = req.body;
-
-    // Find user by phone number
-    const user = await Vehicle.findOne({ phoneNumber });
-    if (!user) {
-      return res.status(400).json({ 
-        error: "Phone number not registered. Please register first." 
-      });
-    }
-
-    // Check password
-    if (user.password !== password) {
-      return res.status(400).json({ 
-        error: "Invalid password!" 
-      });
-    }
-
-    // Return user data without password
-    const userData = {
-      phoneNumber: user.phoneNumber,
-      vehicleId: user.vehicleId,
-      name: user.fullName,
-      registeredAt: user.registeredAt,
-    };
-
-    res.json({ 
-      success: true, 
-      message: "Login successful", 
-      user: userData 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
