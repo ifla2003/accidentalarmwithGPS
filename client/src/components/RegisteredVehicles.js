@@ -3,9 +3,15 @@ import './RegisteredVehicles.css';
 
 const RegisteredVehicles = ({ vehicles, onRemoveVehicle, onToggleDriving }) => {
   const getVehicleStatus = (vehicle) => {
+    // Check if location tracking is disabled
+    if (!vehicle.locationTrackingEnabled) return 'NO GPS';
+    
+    // Check if no location data
     if (!vehicle.currentLocation || 
         vehicle.currentLocation.latitude == null || 
         vehicle.currentLocation.longitude == null) return 'NO GPS';
+    
+    // Check if vehicle is stopped
     if (!vehicle.isDriving) return 'STOPPED';
     
     // Check collision status based on location
