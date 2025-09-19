@@ -27,8 +27,8 @@ const RegisteredVehicles = ({ vehicles, onRemoveVehicle, onToggleDriving }) => {
       }
     });
     
-    if (minDistance <= 7) return 'COLLISION RISK';
-    if (minDistance <= 10) return 'WARNING';
+    if (minDistance <= 3) return 'COLLISION RISK';
+    if (minDistance <= 5) return 'WARNING';
     return 'SAFE';
   };
 

@@ -52,8 +52,8 @@ const createVehicleIcon = (status, vehicleId) => {
   });
 };
 
-// Component to fit map bounds to all vehicles
-const FitBounds = ({ vehicles }) => {
+// Component to fit map bounds to current user and nearby vehicles
+const FitBounds = ({ vehicles, currentUser }) => {
   const map = useMap();
   
   useEffect(() => {
@@ -62,15 +62,47 @@ const FitBounds = ({ vehicles }) => {
     );
     
     if (validVehicles.length > 0) {
-      const bounds = L.latLngBounds(
-        validVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
+      // Find current user's vehicle
+      const currentUserVehicle = validVehicles.find(v => 
+        v.phoneNumber === currentUser?.phoneNumber
       );
       
-      // Add some padding to the bounds
-      const paddedBounds = bounds.pad(0.1);
-      map.fitBounds(paddedBounds);
+      if (currentUserVehicle) {
+        // Focus on current user's location with nearby vehicles
+        const userLocation = [
+          currentUserVehicle.currentLocation.latitude,
+          currentUserVehicle.currentLocation.longitude
+        ];
+        
+        // Find vehicles within 5km of current user
+        const nearbyVehicles = validVehicles.filter(v => {
+          if (v.phoneNumber === currentUser.phoneNumber) return true;
+          
+          const distance = calculateDistance(currentUserVehicle, v);
+          return distance <= 5000; // 5km radius
+        });
+        
+        if (nearbyVehicles.length > 1) {
+          // If there are nearby vehicles, fit bounds to include them
+          const bounds = L.latLngBounds(
+            nearbyVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
+          );
+          const paddedBounds = bounds.pad(0.2);
+          map.fitBounds(paddedBounds);
+        } else {
+          // If no nearby vehicles, just center on current user with appropriate zoom
+          map.setView(userLocation, 15); // Zoom level 15 for city-level view
+        }
+      } else {
+        // If current user not found, fit all vehicles
+        const bounds = L.latLngBounds(
+          validVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
+        );
+        const paddedBounds = bounds.pad(0.1);
+        map.fitBounds(paddedBounds);
+      }
     }
-  }, [vehicles, map]);
+  }, [vehicles, currentUser, map]);
   
   return null;
 };
@@ -111,9 +143,9 @@ const getVehicleStatus = (vehicle, allVehicles) => {
         minDistance = distance;
       }
       
-      if (distance <= 7) {
+      if (distance <= 3) {
         status = 'collision';
-      } else if (distance <= 10 && status !== 'collision') {
+      } else if (distance <= 5 && status !== 'collision') {
         status = 'warning';
       }
     }
@@ -138,9 +170,14 @@ const VehiclePositionsMap = ({ vehicles, allUsers, currentUser }) => {
 
   // Default center (New York City) if no vehicles
   const defaultCenter = [40.7128, -74.0060];
-  const mapCenter = validVehicles.length > 0 
-    ? [validVehicles[0].currentLocation.latitude, validVehicles[0].currentLocation.longitude]
-    : defaultCenter;
+  
+  // Prioritize current user's location for map center
+  const currentUserVehicle = validVehicles.find(v => v.phoneNumber === currentUser?.phoneNumber);
+  const mapCenter = currentUserVehicle 
+    ? [currentUserVehicle.currentLocation.latitude, currentUserVehicle.currentLocation.longitude]
+    : validVehicles.length > 0 
+      ? [validVehicles[0].currentLocation.latitude, validVehicles[0].currentLocation.longitude]
+      : defaultCenter;
 
   return (
     <div className="vehicle-positions-map">
@@ -188,7 +225,7 @@ const VehiclePositionsMap = ({ vehicles, allUsers, currentUser }) => {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             
-            <FitBounds vehicles={validVehicles} />
+            <FitBounds vehicles={validVehicles} currentUser={currentUser} />
             
             {validVehicles.map((vehicle) => {
               const { status, minDistance } = getVehicleStatus(vehicle, validVehicles);

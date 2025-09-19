@@ -306,10 +306,18 @@ io.on("connection", (socket) => {
 
 // Collision detection function
 async function checkCollisionRisk(currentVehicle, io) {
-  const COLLISION_DISTANCE = 7; // 7 meter collision threshold
-  const WARNING_DISTANCE = 10; // 10 meter warning threshold
+  const COLLISION_DISTANCE = 3; // 3 meter collision threshold
+  const WARNING_DISTANCE = 5; // 5 meter warning threshold
 
   try {
+    // Only check collision if current vehicle has location tracking enabled
+    if (!currentVehicle.locationTrackingEnabled) {
+      console.log(
+        `Vehicle ${currentVehicle.vehicleId} has location tracking disabled, skipping collision check`
+      );
+      return;
+    }
+
     // Only check collision if current vehicle has valid location data
     if (
       !currentVehicle.currentLocation ||
@@ -322,10 +330,11 @@ async function checkCollisionRisk(currentVehicle, io) {
       return;
     }
 
-    // Find other active vehicles with valid location data and are driving
+    // Find other active vehicles with valid location data, location tracking enabled, and are driving
     const allVehicles = await Vehicle.find({
       isActive: true,
       isDriving: true, // Only check collision with driving vehicles
+      locationTrackingEnabled: true, // Only check collision with vehicles that have location tracking enabled
       phoneNumber: { $ne: currentVehicle.phoneNumber },
       "currentLocation.latitude": { $exists: true, $ne: null },
       "currentLocation.longitude": { $exists: true, $ne: null },
@@ -389,16 +398,16 @@ async function checkCollisionRisk(currentVehicle, io) {
             `🚨 COLLISION ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
           );
 
-          // Send collision alert to the current vehicle user
-          if (currentUserSocket) {
+          // Send collision alert to the current vehicle user (only if location tracking is enabled)
+          if (currentUserSocket && currentVehicle.locationTrackingEnabled) {
             currentUserSocket.emit("collision-alert", collisionAlertData);
           }
 
-          // Also send alert to the other vehicle user
+          // Also send alert to the other vehicle user (only if their location tracking is enabled)
           const otherUserSocket = findSocketByPhoneNumber(
             otherVehicle.phoneNumber
           );
-          if (otherUserSocket) {
+          if (otherUserSocket && otherVehicle.locationTrackingEnabled) {
             const otherVehicleAlertData = {
               type: "COLLISION_ALERT",
               alertLevel: "COLLISION",
@@ -433,16 +442,16 @@ async function checkCollisionRisk(currentVehicle, io) {
             `⚠️ WARNING ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
           );
 
-          // Send warning alert to the current vehicle user
-          if (currentUserSocket) {
+          // Send warning alert to the current vehicle user (only if location tracking is enabled)
+          if (currentUserSocket && currentVehicle.locationTrackingEnabled) {
             currentUserSocket.emit("collision-alert", warningAlertData);
           }
 
-          // Also send warning alert to the other vehicle user
+          // Also send warning alert to the other vehicle user (only if their location tracking is enabled)
           const otherUserSocket = findSocketByPhoneNumber(
             otherVehicle.phoneNumber
           );
-          if (otherUserSocket) {
+          if (otherUserSocket && otherVehicle.locationTrackingEnabled) {
             const otherVehicleWarningData = {
               type: "WARNING_ALERT",
               alertLevel: "WARNING",

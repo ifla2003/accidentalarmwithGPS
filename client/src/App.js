@@ -18,9 +18,9 @@ function App() {
   const [systemStatus, setSystemStatus] = useState({
     monitoring: "Active",
     lastUpdate: new Date().toLocaleTimeString(),
-    collisionThreshold: 7,
-    warningThreshold: 10,
-    maxRange: "0.6km / 10km max range",
+    collisionThreshold: 3,
+    warningThreshold: 5,
+    maxRange: "0.6km / 5km max range",
   });
 
   // Separate useEffect for socket setup
