@@ -77,7 +77,7 @@ function App() {
   useEffect(() => {
     const checkExistingUser = async () => {
       // Try to get user from a stored phone number
-      const storedPhone = sessionStorage.getItem("userPhone");
+      const storedPhone = localStorage.getItem("userPhone");
       if (storedPhone) {
         try {
           const response = await fetch(`https://vehiclecollisionapp.testatozas.in/api/user/${storedPhone}`);
@@ -90,13 +90,13 @@ function App() {
                 .catch(error => console.error("Auto-registration failed:", error));
             }
           } else {
-            // User not found in database, clear session storage
-            sessionStorage.removeItem("userPhone");
+            // User not found in database, clear local storage
+            localStorage.removeItem("userPhone");
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
-          // Clear session storage on error
-          sessionStorage.removeItem("userPhone");
+          // Clear local storage on error
+          localStorage.removeItem("userPhone");
         }
       }
     };

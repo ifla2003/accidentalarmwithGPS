@@ -70,8 +70,8 @@ const LocationTrackingControl = ({
         });
       }
       
-      // Store phone number in sessionStorage for future reference
-      sessionStorage.setItem("userPhone", userDetails.phoneNumber);
+      // Store phone number in localStorage for future reference
+      localStorage.setItem("userPhone", userDetails.phoneNumber);
       
       setIsDetailsSaved(true);
       alert('Details saved successfully!');
