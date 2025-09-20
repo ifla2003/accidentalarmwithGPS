@@ -82,25 +82,34 @@ const FitBounds = ({ vehicles, currentUser }) => {
           return distance <= 5000; // 5km radius
         });
         
-        if (nearbyVehicles.length > 1) {
-          // If there are nearby vehicles, fit bounds to include them
-          const bounds = L.latLngBounds(
-            nearbyVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
-          );
-          const paddedBounds = bounds.pad(0.2);
-          map.fitBounds(paddedBounds);
-        } else {
-          // If no nearby vehicles, just center on current user with appropriate zoom
-          map.setView(userLocation, 15); // Zoom level 15 for city-level view
-        }
-      } else {
-        // If current user not found, fit all vehicles
-        const bounds = L.latLngBounds(
-          validVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
-        );
-        const paddedBounds = bounds.pad(0.1);
-        map.fitBounds(paddedBounds);
-      }
+         if (nearbyVehicles.length > 1) {
+           // If there are nearby vehicles, fit bounds to include them with smooth animation
+           const bounds = L.latLngBounds(
+             nearbyVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
+           );
+           const paddedBounds = bounds.pad(0.2);
+           map.fitBounds(paddedBounds, {
+             duration: 2.0, // 2 second animation
+             easeLinearity: 0.1
+           });
+         } else {
+           // If no nearby vehicles, center on current user with smooth zoom animation
+           map.setView(userLocation, 15, {
+             animate: true,
+             duration: 2.0 // 2 second animation
+           });
+         }
+       } else {
+         // If current user not found, fit all vehicles with smooth animation
+         const bounds = L.latLngBounds(
+           validVehicles.map(v => [v.currentLocation.latitude, v.currentLocation.longitude])
+         );
+         const paddedBounds = bounds.pad(0.1);
+         map.fitBounds(paddedBounds, {
+           duration: 2.0, // 2 second animation
+           easeLinearity: 0.1
+         });
+       }
     }
   }, [vehicles, currentUser, map]);
   
@@ -283,18 +292,18 @@ const VehiclePositionsMap = ({ vehicles, allUsers, currentUser }) => {
       <div className="map-legend">
         <h4>Legend</h4>
         <div className="legend-items">
-          <div className="legend-item">
-            <div className="legend-dot" style={{ backgroundColor: '#27ae60' }}></div>
-            <span>Safe Distance (&gt;10m)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-dot" style={{ backgroundColor: '#f39c12' }}></div>
-            <span>Warning Zone (7-10m)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-dot" style={{ backgroundColor: '#e74c3c' }}></div>
-            <span>Collision Risk (&lt;7m)</span>
-          </div>
+           <div className="legend-item">
+             <div className="legend-dot" style={{ backgroundColor: '#27ae60' }}></div>
+             <span>Safe Distance (&gt;5m)</span>
+           </div>
+           <div className="legend-item">
+             <div className="legend-dot" style={{ backgroundColor: '#f39c12' }}></div>
+             <span>Warning Zone (3-5m)</span>
+           </div>
+           <div className="legend-item">
+             <div className="legend-dot" style={{ backgroundColor: '#e74c3c' }}></div>
+             <span>Collision Risk (&lt;3m)</span>
+           </div>
           <div className="legend-item">
             <div className="legend-dot" style={{ backgroundColor: '#95a5a6' }}></div>
             <span>No GPS Data</span>
