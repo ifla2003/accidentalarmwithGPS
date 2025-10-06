@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from "react";
 import "./LocationTrackingControl.css";
 
+// Vehicle emoji mapping
+const getVehicleEmoji = (vehicleType) => {
+  const emojis = {
+    car: '🚗',
+    bike: '🏍️',
+    auto: '🛺',
+    truck: '🚚',
+    bus: '🚌',
+    bicycle: '🚴'
+  };
+  return emojis[vehicleType] || '🚗';
+};
+
 const LocationTrackingControl = ({
   currentUser,
   vehicles,
@@ -17,7 +30,8 @@ const LocationTrackingControl = ({
   const [userDetails, setUserDetails] = useState({
     name: '',
     phoneNumber: '',
-    vehicleId: ''
+    vehicleId: '',
+    vehicleType: 'car'
   });
   const [isDetailsSaved, setIsDetailsSaved] = useState(false);
 
@@ -50,14 +64,14 @@ const LocationTrackingControl = ({
   };
 
   const handleAddDetails = async () => {
-    if (!userDetails.name.trim() || !userDetails.phoneNumber.trim() || !userDetails.vehicleId.trim()) {
+    if (!userDetails.name.trim() || !userDetails.phoneNumber.trim() || !userDetails.vehicleId.trim() || !userDetails.vehicleType.trim()) {
       alert('Please fill in all fields');
       return;
     }
 
     try {
       // Add vehicle to database
-      const result = await onAddVehicle(userDetails.phoneNumber, userDetails.vehicleId, userDetails.name);
+      const result = await onAddVehicle(userDetails.phoneNumber, userDetails.vehicleId, userDetails.name, userDetails.vehicleType);
       
       // Update current user state with data from server
       if (result.user) {
@@ -66,7 +80,8 @@ const LocationTrackingControl = ({
         onUpdateUser({
           name: userDetails.name,
           phoneNumber: userDetails.phoneNumber,
-          vehicleId: userDetails.vehicleId
+          vehicleId: userDetails.vehicleId,
+          vehicleType: userDetails.vehicleType
         });
       }
       
@@ -203,6 +218,22 @@ const LocationTrackingControl = ({
                 required
               />
             </div>
+            <div className="form-group">
+              <label>Vehicle Type:</label>
+              <select
+                name="vehicleType"
+                value={userDetails.vehicleType}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="car">🚗 Car</option>
+                <option value="bike">🏍️ Bike</option>
+                <option value="auto">🛺 Auto</option>
+                <option value="truck">🚚 Truck</option>
+                <option value="bus">🚌 Bus</option>
+                <option value="bicycle">🚴 Bicycle</option>
+              </select>
+            </div>
             <button
               onClick={handleAddDetails}
               className="add-details-btn"
@@ -218,6 +249,9 @@ const LocationTrackingControl = ({
             </p>
             <p>
               <strong>Vehicle ID:</strong> {currentUser.vehicleId}
+            </p>
+            <p>
+              <strong>Vehicle Type:</strong> {getVehicleEmoji(currentUser.vehicleType)} {currentUser.vehicleType?.charAt(0).toUpperCase() + currentUser.vehicleType?.slice(1)}
             </p>
             <p>
               <strong>Phone:</strong> {currentUser.phoneNumber}

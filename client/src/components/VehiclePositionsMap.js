@@ -16,8 +16,76 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+// Vehicle emoji mapping
+const getVehicleEmoji = (vehicleType) => {
+  const emojis = {
+    car: '🚗',
+    bike: '🏍️',
+    auto: '🛺',
+    truck: '🚚',
+    bus: '🚌',
+    bicycle: '🚴'
+  };
+  return emojis[vehicleType] || '🚗';
+};
+
+// Animated Marker Component for smooth movement
+const AnimatedMarker = ({ position, icon, children, eventHandlers }) => {
+  const markerRef = useRef(null);
+  const previousPosition = useRef(position);
+
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (marker && previousPosition.current) {
+      const [prevLat, prevLng] = previousPosition.current;
+      const [newLat, newLng] = position;
+      
+      // Only animate if position actually changed
+      if (prevLat !== newLat || prevLng !== newLng) {
+        // Smooth transition animation
+        const startTime = Date.now();
+        const duration = 1000; // 1 second animation
+        
+        const animate = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Easing function for smooth animation
+          const easeProgress = progress < 0.5 
+            ? 2 * progress * progress 
+            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+          
+          const currentLat = prevLat + (newLat - prevLat) * easeProgress;
+          const currentLng = prevLng + (newLng - prevLng) * easeProgress;
+          
+          marker.setLatLng([currentLat, currentLng]);
+          
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          }
+        };
+        
+        animate();
+      }
+    }
+    
+    previousPosition.current = position;
+  }, [position]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={position}
+      icon={icon}
+      eventHandlers={eventHandlers}
+    >
+      {children}
+    </Marker>
+  );
+};
+
 // Custom vehicle icons based on status
-const createVehicleIcon = (status, vehicleId) => {
+const createVehicleIcon = (status, vehicleType, vehicleId) => {
   const colors = {
     safe: '#27ae60',
     warning: '#f39c12', 
@@ -26,29 +94,29 @@ const createVehicleIcon = (status, vehicleId) => {
   };
 
   const color = colors[status] || colors['no-gps'];
+  const vehicleEmoji = getVehicleEmoji(vehicleType);
   
   return L.divIcon({
     html: `
       <div style="
         background-color: ${color};
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         border: 3px solid white;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: bold;
-        font-size: 10px;
-        color: white;
+        font-size: 16px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
       ">
-        ${vehicleId.slice(-1)}
+        ${vehicleEmoji}
       </div>
     `,
     className: 'custom-vehicle-icon',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
   });
 };
 
@@ -241,10 +309,10 @@ const VehiclePositionsMap = ({ vehicles, allUsers, currentUser }) => {
               const isCurrentUser = currentUser && vehicle.phoneNumber === currentUser.phoneNumber;
               
               return (
-                <Marker
-                  key={vehicle.phoneNumber}
-                  position={[vehicle.currentLocation.latitude, vehicle.currentLocation.longitude]}
-                  icon={createVehicleIcon(status, vehicle.vehicleId)}
+                 <AnimatedMarker
+                   key={vehicle.phoneNumber}
+                   position={[vehicle.currentLocation.latitude, vehicle.currentLocation.longitude]}
+                   icon={createVehicleIcon(status, vehicle.vehicleType, vehicle.vehicleId)}
                   eventHandlers={{
                     click: () => setSelectedVehicle(vehicle),
                   }}
@@ -278,11 +346,11 @@ const VehiclePositionsMap = ({ vehicles, allUsers, currentUser }) => {
                         {vehicle.currentLocation.isSimulated && (
                           <p className="simulated-badge">📍 Simulated Location</p>
                         )}
-                        <p><strong>Driving:</strong> {vehicle.isDriving ? '🚗 Yes' : '🛑 Stopped'}</p>
+                        <p><strong>Driving:</strong> {vehicle.isDriving ? '🚗 Yes' : '🛑 Stopped'}                        </p>
                       </div>
                     </div>
                   </Popup>
-                </Marker>
+                </AnimatedMarker>
               );
             })}
           </MapContainer>

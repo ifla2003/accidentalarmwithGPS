@@ -1,29 +1,59 @@
 import React, { useEffect, useState } from "react";
 import "./CollisionAlert.css";
 
+// Vehicle emoji mapping
+const getVehicleEmoji = (vehicleType) => {
+  const emojis = {
+    car: '🚗',
+    bike: '🏍️',
+    auto: '🛺',
+    truck: '🚚',
+    bus: '🚌',
+    bicycle: '🚴'
+  };
+  return emojis[vehicleType] || '🚗';
+};
+
 const CollisionAlert = ({ alert, onDismiss }) => {
   const [isBlinking, setIsBlinking] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
 
+  const isCombinedAlert = alert.type === "COMBINED_ALERT";
   const isCollisionAlert = alert.alertLevel === "COLLISION";
   const isWarningAlert = alert.alertLevel === "WARNING";
+
+  // For combined alerts, get vehicle lists
+  const collisionVehicles = isCombinedAlert ? (alert.collisionVehicles || []) : [];
+  const warningVehicles = isCombinedAlert ? (alert.warningVehicles || []) : [];
+  const totalVehicles = collisionVehicles.length + warningVehicles.length;
 
   useEffect(() => {
     // Start voice alert based on alert type
     if ("speechSynthesis" in window) {
       let message = "";
-      if (isCollisionAlert) {
-        message = `Collision alert! Vehicle ${
-          alert.nearbyVehicle.vehicleId
-        } is only ${alert.distance.toFixed(
-          1
-        )} meters away! Take immediate action!`;
-      } else if (isWarningAlert) {
-        message = `Warning! Vehicle ${
-          alert.nearbyVehicle.vehicleId
-        } is ${alert.distance.toFixed(
-          1
-        )} meters away. Please maintain safe distance.`;
+      if (isCombinedAlert) {
+        if (collisionVehicles.length > 0) {
+          const directions = collisionVehicles.map(v => v.direction?.name).filter(Boolean).join(', ');
+          message = `Collision alert! ${collisionVehicles.length} vehicle${collisionVehicles.length > 1 ? 's' : ''} within 3 meters${directions ? ` from ${directions} direction` : ''}! Take immediate action!`;
+        } else if (warningVehicles.length > 0) {
+          const directions = warningVehicles.map(v => v.direction?.name).filter(Boolean).join(', ');
+          message = `Warning! ${warningVehicles.length} vehicle${warningVehicles.length > 1 ? 's' : ''} within 5 meters${directions ? ` from ${directions} direction` : ''}. Please maintain safe distance.`;
+        }
+      } else {
+        // Legacy single vehicle alerts
+        if (isCollisionAlert) {
+          message = `Collision alert! Vehicle ${
+            alert.nearbyVehicle.vehicleId
+          } is only ${alert.distance.toFixed(
+            1
+          )} meters away! Take immediate action!`;
+        } else if (isWarningAlert) {
+          message = `Warning! Vehicle ${
+            alert.nearbyVehicle.vehicleId
+          } is ${alert.distance.toFixed(
+            1
+          )} meters away. Please maintain safe distance.`;
+        }
       }
 
       const utterance = new SpeechSynthesisUtterance(message);
@@ -157,32 +187,111 @@ const CollisionAlert = ({ alert, onDismiss }) => {
         <div className="alert-icon">{getAlertIcon()}</div>
         <div className="alert-text">
           <h2>{getAlertTitle()}</h2>
-          <div className="vehicles-involved">
-            <h3>Nearby Vehicle:</h3>
-            <div className="nearby-vehicle">
-              <div className="vehicle-info">
-                <div className="vehicle-name">
-                  {alert.nearbyVehicle.vehicleId} -{" "}
-                  {alert.nearbyVehicle.fullName}
+          
+          {isCombinedAlert ? (
+            <div className="vehicles-involved">
+              {collisionVehicles.length > 0 && (
+                <div className="collision-vehicles-section">
+                  <h3>🚨 COLLISION RISK ({collisionVehicles.length} vehicle{collisionVehicles.length > 1 ? 's' : ''})</h3>
+                  <div className="vehicle-list collision-list">
+                    {collisionVehicles.map((vehicle, index) => (
+                      <div key={vehicle.phoneNumber} className="vehicle-item collision-item">
+                        <div className="vehicle-emoji">{getVehicleEmoji(vehicle.vehicleType)}</div>
+                        <div className="vehicle-details">
+                          <div className="vehicle-name">
+                            {vehicle.vehicleId} - {vehicle.fullName}
+                          </div>
+                          <div className="vehicle-distance">
+                            {vehicle.distance.toFixed(1)}m away
+                          </div>
+                          <div className="vehicle-direction">
+                            {vehicle.direction && (
+                              <span>
+                                {vehicle.direction.emoji} {vehicle.direction.name} direction
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="vehicle-phone">
-                  {alert.nearbyVehicle.phoneNumber}
+              )}
+              
+              {warningVehicles.length > 0 && (
+                <div className="warning-vehicles-section">
+                  <h3>⚠️ WARNING ZONE ({warningVehicles.length} vehicle{warningVehicles.length > 1 ? 's' : ''})</h3>
+                  <div className="vehicle-list warning-list">
+                    {warningVehicles.map((vehicle, index) => (
+                      <div key={vehicle.phoneNumber} className="vehicle-item warning-item">
+                        <div className="vehicle-emoji">{getVehicleEmoji(vehicle.vehicleType)}</div>
+                        <div className="vehicle-details">
+                          <div className="vehicle-name">
+                            {vehicle.vehicleId} - {vehicle.fullName}
+                          </div>
+                          <div className="vehicle-distance">
+                            {vehicle.distance.toFixed(1)}m away
+                          </div>
+                          <div className="vehicle-direction">
+                            {vehicle.direction && (
+                              <span>
+                                {vehicle.direction.emoji} {vehicle.direction.name} direction
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Legacy single vehicle display
+            <div className="vehicles-involved">
+              <h3>Nearby Vehicle:</h3>
+              <div className="nearby-vehicle">
+                <div className="vehicle-info">
+                  <div className="vehicle-name">
+                    {alert.nearbyVehicle.vehicleId} -{" "}
+                    {alert.nearbyVehicle.fullName}
+                  </div>
+                  <div className="vehicle-phone">
+                    {alert.nearbyVehicle.phoneNumber}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+          
           <div className={`distance-warning ${alertClass}`}>
-            <p>
-              Distance: <strong>{alert.distance.toFixed(1)} meters</strong>
-            </p>
-            <p className="danger-text">{getDangerText()}</p>
-            {isCollisionAlert && (
-              <p className="action-text">
-                STOP OR CHANGE DIRECTION IMMEDIATELY!
-              </p>
-            )}
-            {isWarningAlert && (
-              <p className="action-text">Reduce speed and maintain awareness</p>
+            {isCombinedAlert ? (
+              <>
+                <p className="danger-text">{getDangerText()}</p>
+                {collisionVehicles.length > 0 && (
+                  <p className="action-text">
+                    STOP OR CHANGE DIRECTION IMMEDIATELY!
+                  </p>
+                )}
+                {warningVehicles.length > 0 && collisionVehicles.length === 0 && (
+                  <p className="action-text">Reduce speed and maintain awareness</p>
+                )}
+              </>
+            ) : (
+              <>
+                <p>
+                  Distance: <strong>{alert.distance.toFixed(1)} meters</strong>
+                </p>
+                <p className="danger-text">{getDangerText()}</p>
+                {isCollisionAlert && (
+                  <p className="action-text">
+                    STOP OR CHANGE DIRECTION IMMEDIATELY!
+                  </p>
+                )}
+                {isWarningAlert && (
+                  <p className="action-text">Reduce speed and maintain awareness</p>
+                )}
+              </>
             )}
           </div>
           <p className="timestamp">

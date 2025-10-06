@@ -42,10 +42,11 @@ function App() {
     });
 
     // Listen for collision alerts
-    socket.on("collision-alert", (alert) => {
-      setCollisionAlert(alert);
-      setTimeout(() => setCollisionAlert(null), 10000);
-    });
+      socket.on("collision-alert", (alert) => {
+        setCollisionAlert(alert);
+        // Auto-dismiss alert after 3 minutes (180 seconds)
+        setTimeout(() => setCollisionAlert(null), 180000);
+      });
 
     // Request initial vehicle list and all users
     socket.emit("get-vehicles");
@@ -86,7 +87,7 @@ function App() {
             if (result.success) {
               setCurrentUser(result.user);
               // Auto-register the user as a vehicle (but don't wait for response)
-              handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name)
+              handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
                 .catch(error => console.error("Auto-registration failed:", error));
             }
           } else {
@@ -128,7 +129,7 @@ function App() {
     console.log(`Simulated location for ${userData.name}:`, simulatedLocation);
     handleLocationUpdate(simulatedLocation);
 
-    // Start simulated movement (moves vehicle slightly every 15 seconds)
+    // Start simulated movement (moves vehicle slightly every 3 seconds for smooth animation)
     const simulationInterval = setInterval(() => {
       const updatedLocation = {
         phoneNumber: userData.phoneNumber,
@@ -143,7 +144,7 @@ function App() {
 
       console.log(`Simulated movement for ${userData.name}:`, updatedLocation);
       handleLocationUpdate(updatedLocation);
-    }, 15000); // Update every 15 seconds
+    }, 3000); // Update every 3 seconds for smooth animation
 
     // Store simulation interval for cleanup
     localStorage.setItem("simulationInterval", simulationInterval);
@@ -214,7 +215,7 @@ function App() {
             },
             {
               enableHighAccuracy: false, // Less battery intensive
-              maximumAge: 5000, // Allow older positions
+              maximumAge: 2000, // Allow positions up to 2 seconds old for smoother updates
               timeout: 30000, // Longer timeout for watch
             }
           );
@@ -319,7 +320,7 @@ function App() {
       );
       handleLocationUpdate(simulatedLocation);
 
-      // Start simulated movement (optional - moves vehicle slightly every 10 seconds)
+      // Start simulated movement (optional - moves vehicle slightly every 3 seconds for smooth animation)
       const simulationInterval = setInterval(() => {
         const updatedLocation = {
           phoneNumber: userData.phoneNumber,
@@ -337,7 +338,7 @@ function App() {
           updatedLocation
         );
         handleLocationUpdate(updatedLocation);
-      }, 10000); // Update every 10 seconds
+      }, 3000); // Update every 3 seconds for smooth animation
 
       // Store simulation interval for cleanup
       localStorage.setItem("simulationInterval", simulationInterval);
@@ -385,7 +386,7 @@ function App() {
             },
             {
               enableHighAccuracy: false,
-              maximumAge: 5000,
+              maximumAge: 2000, // More frequent updates for smoother movement
               timeout: 30000,
             }
           );
@@ -408,9 +409,9 @@ function App() {
     startTracking();
   };
 
-  const handleAddVehicle = (phoneNumber, vehicleId, fullName) => {
+  const handleAddVehicle = (phoneNumber, vehicleId, fullName, vehicleType) => {
     return new Promise((resolve, reject) => {
-      socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName });
+      socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName, vehicleType });
       
       // Listen for registration success
       const handleSuccess = (data) => {

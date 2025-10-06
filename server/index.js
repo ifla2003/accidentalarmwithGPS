@@ -3,7 +3,7 @@ const http = require("http");
 const socketIo = require("socket.io");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const { getDistance } = require("geolib");
+const { getDistance, getRhumbLineBearing } = require("geolib");
 require("dotenv").config();
 const path = require("path");
 
@@ -34,6 +34,7 @@ const vehicleSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true, unique: true },
   vehicleId: { type: String, required: true },
   fullName: { type: String, required: true },
+  vehicleType: { type: String, required: true, default: 'car' }, // bike, car, auto, truck, bus
   registeredAt: { type: Date, default: Date.now },
   currentLocation: {
     latitude: Number,
@@ -66,7 +67,7 @@ io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
   socket.on("register-vehicle", async (data) => {
-    const { phoneNumber, vehicleId, fullName } = data;
+    const { phoneNumber, vehicleId, fullName, vehicleType } = data;
     activeConnections.set(socket.id, { phoneNumber, vehicleId, fullName });
 
     try {
@@ -86,6 +87,7 @@ io.on("connection", (socket) => {
           phoneNumber,
           vehicleId,
           fullName,
+          vehicleType: vehicleType || 'car',
           isActive: true,
           isDriving: true,
           locationTrackingEnabled: false,
@@ -102,6 +104,7 @@ io.on("connection", (socket) => {
         phoneNumber: vehicle.phoneNumber,
         vehicleId: vehicle.vehicleId,
         name: vehicle.fullName,
+        vehicleType: vehicle.vehicleType,
         registeredAt: vehicle.registeredAt,
       };
 
@@ -275,7 +278,7 @@ io.on("connection", (socket) => {
 
       if (vehicle) {
         console.log(
-          `Vehicle ${vehicle.vehicleId} updated in DB: ${vehicle.currentLocation.latitude}, ${vehicle.currentLocation.longitude}`
+          `✅ Vehicle ${vehicle.vehicleId} location updated in database: ${vehicle.currentLocation.latitude}, ${vehicle.currentLocation.longitude} (accuracy: ${vehicle.currentLocation.accuracy}m)`
         );
 
         // Check for nearby vehicles
@@ -303,6 +306,28 @@ io.on("connection", (socket) => {
     activeConnections.delete(socket.id);
   });
 });
+
+// Function to convert bearing to direction
+function getDirectionFromBearing(bearing) {
+  const directions = [
+    { name: "North", emoji: "⬆️", range: [0, 22.5] },
+    { name: "Northeast", emoji: "↗️", range: [22.5, 67.5] },
+    { name: "East", emoji: "➡️", range: [67.5, 112.5] },
+    { name: "Southeast", emoji: "↘️", range: [112.5, 157.5] },
+    { name: "South", emoji: "⬇️", range: [157.5, 202.5] },
+    { name: "Southwest", emoji: "↙️", range: [202.5, 247.5] },
+    { name: "West", emoji: "⬅️", range: [247.5, 292.5] },
+    { name: "Northwest", emoji: "↖️", range: [292.5, 337.5] },
+    { name: "North", emoji: "⬆️", range: [337.5, 360] }
+  ];
+
+  for (const direction of directions) {
+    if (bearing >= direction.range[0] && bearing < direction.range[1]) {
+      return direction;
+    }
+  }
+  return directions[0]; // Default to North
+}
 
 // Collision detection function
 async function checkCollisionRisk(currentVehicle, io) {
@@ -357,6 +382,10 @@ async function checkCollisionRisk(currentVehicle, io) {
       currentVehicle.phoneNumber
     );
 
+    // Collect all nearby vehicles for combined alert
+    const collisionVehicles = [];
+    const warningVehicles = [];
+
     for (const otherVehicle of allVehicles) {
       // Double-check that location data is valid
       if (
@@ -376,98 +405,75 @@ async function checkCollisionRisk(currentVehicle, io) {
 
         // Log coordinates and distance calculation for debugging
         console.log(
-          `Distance between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}: ${distance} meters`
+          `📏 Distance calculation: ${currentVehicle.vehicleId} (${currentVehicle.currentLocation.latitude}, ${currentVehicle.currentLocation.longitude}) ↔ ${otherVehicle.vehicleId} (${otherVehicle.currentLocation.latitude}, ${otherVehicle.currentLocation.longitude}) = ${distance}m`
         );
 
-        // Check if distance is within collision threshold (7m)
+        // Calculate bearing from current vehicle to other vehicle
+        const bearing = getRhumbLineBearing(
+          {
+            latitude: currentVehicle.currentLocation.latitude,
+            longitude: currentVehicle.currentLocation.longitude
+          },
+          {
+            latitude: otherVehicle.currentLocation.latitude,
+            longitude: otherVehicle.currentLocation.longitude
+          }
+        );
+        
+        const direction = getDirectionFromBearing(bearing);
+
+        // Check if distance is within collision threshold (3m)
         if (distance <= COLLISION_DISTANCE) {
-          const collisionAlertData = {
-            type: "COLLISION_ALERT",
-            alertLevel: "COLLISION",
+          collisionVehicles.push({
+            phoneNumber: otherVehicle.phoneNumber,
+            vehicleId: otherVehicle.vehicleId,
+            fullName: otherVehicle.fullName,
+            vehicleType: otherVehicle.vehicleType,
             distance: distance,
-            nearbyVehicle: {
-              phoneNumber: otherVehicle.phoneNumber,
-              vehicleId: otherVehicle.vehicleId,
-              fullName: otherVehicle.fullName,
-              location: otherVehicle.currentLocation,
-            },
-            timestamp: new Date(),
-          };
+            direction: direction,
+            bearing: bearing,
+            location: otherVehicle.currentLocation,
+          });
 
           console.log(
-            `🚨 COLLISION ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
+            `🚨 COLLISION RISK: ${distance}m - ${otherVehicle.vehicleId} ${direction.emoji} ${direction.name} of ${currentVehicle.vehicleId}`
           );
-
-          // Send collision alert to the current vehicle user (only if location tracking is enabled)
-          if (currentUserSocket && currentVehicle.locationTrackingEnabled) {
-            currentUserSocket.emit("collision-alert", collisionAlertData);
-          }
-
-          // Also send alert to the other vehicle user (only if their location tracking is enabled)
-          const otherUserSocket = findSocketByPhoneNumber(
-            otherVehicle.phoneNumber
-          );
-          if (otherUserSocket && otherVehicle.locationTrackingEnabled) {
-            const otherVehicleAlertData = {
-              type: "COLLISION_ALERT",
-              alertLevel: "COLLISION",
-              distance: distance,
-              nearbyVehicle: {
-                phoneNumber: currentVehicle.phoneNumber,
-                vehicleId: currentVehicle.vehicleId,
-                fullName: currentVehicle.fullName,
-                location: currentVehicle.currentLocation,
-              },
-              timestamp: new Date(),
-            };
-            otherUserSocket.emit("collision-alert", otherVehicleAlertData);
-          }
         }
-        // Check if distance is within warning threshold (10m) but not collision
+        // Check if distance is within warning threshold (5m) but not collision
         else if (distance <= WARNING_DISTANCE) {
-          const warningAlertData = {
-            type: "WARNING_ALERT",
-            alertLevel: "WARNING",
+          warningVehicles.push({
+            phoneNumber: otherVehicle.phoneNumber,
+            vehicleId: otherVehicle.vehicleId,
+            fullName: otherVehicle.fullName,
+            vehicleType: otherVehicle.vehicleType,
             distance: distance,
-            nearbyVehicle: {
-              phoneNumber: otherVehicle.phoneNumber,
-              vehicleId: otherVehicle.vehicleId,
-              fullName: otherVehicle.fullName,
-              location: otherVehicle.currentLocation,
-            },
-            timestamp: new Date(),
-          };
+            direction: direction,
+            bearing: bearing,
+            location: otherVehicle.currentLocation,
+          });
 
           console.log(
-            `⚠️ WARNING ALERT: ${distance}m between ${currentVehicle.vehicleId} and ${otherVehicle.vehicleId}`
+            `⚠️ WARNING: ${distance}m - ${otherVehicle.vehicleId} ${direction.emoji} ${direction.name} of ${currentVehicle.vehicleId}`
           );
-
-          // Send warning alert to the current vehicle user (only if location tracking is enabled)
-          if (currentUserSocket && currentVehicle.locationTrackingEnabled) {
-            currentUserSocket.emit("collision-alert", warningAlertData);
-          }
-
-          // Also send warning alert to the other vehicle user (only if their location tracking is enabled)
-          const otherUserSocket = findSocketByPhoneNumber(
-            otherVehicle.phoneNumber
-          );
-          if (otherUserSocket && otherVehicle.locationTrackingEnabled) {
-            const otherVehicleWarningData = {
-              type: "WARNING_ALERT",
-              alertLevel: "WARNING",
-              distance: distance,
-              nearbyVehicle: {
-                phoneNumber: currentVehicle.phoneNumber,
-                vehicleId: currentVehicle.vehicleId,
-                fullName: currentVehicle.fullName,
-                location: currentVehicle.currentLocation,
-              },
-              timestamp: new Date(),
-            };
-            otherUserSocket.emit("collision-alert", otherVehicleWarningData);
-          }
         }
       }
+    }
+
+    // Send combined alert if there are any nearby vehicles
+    if ((collisionVehicles.length > 0 || warningVehicles.length > 0) && currentUserSocket && currentVehicle.locationTrackingEnabled) {
+      const combinedAlertData = {
+        type: "COMBINED_ALERT",
+        alertLevel: collisionVehicles.length > 0 ? "COLLISION" : "WARNING",
+        collisionVehicles: collisionVehicles,
+        warningVehicles: warningVehicles,
+        timestamp: new Date(),
+      };
+
+      console.log(
+        `📢 COMBINED ALERT for ${currentVehicle.vehicleId}: ${collisionVehicles.length} collision risks, ${warningVehicles.length} warnings`
+      );
+
+      currentUserSocket.emit("collision-alert", combinedAlertData);
     }
   } catch (error) {
     console.error("Collision check error:", error);
@@ -524,6 +530,7 @@ app.get("/api/user/:phoneNumber", async (req, res) => {
       phoneNumber: user.phoneNumber,
       vehicleId: user.vehicleId,
       name: user.fullName,
+      vehicleType: user.vehicleType,
       registeredAt: user.registeredAt,
     };
 
