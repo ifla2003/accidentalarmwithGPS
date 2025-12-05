@@ -39,9 +39,21 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_HOST: ${{ secrets.VPS_PORT }}
           VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
         run: |
+          set -e
+
+          # Basic validation so failures clearly point to missing secrets
+          if [ -z "$SSH_KEY" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_APP_DIR" ]; then
+            echo "ERROR: One or more required VPS_* secrets are missing or empty."
+            echo "  VPS_SSH_KEY set?  -> $([ -n "$SSH_KEY" ] && echo yes || echo no)"
+            echo "  VPS_USER set?     -> $([ -n "$VPS_USER" ] && echo yes || echo no)"
+            echo "  VPS_HOST set?     -> $([ -n "$VPS_HOST" ] && echo yes || echo no)"
+            echo "  VPS_APP_DIR set?  -> $([ -n "$VPS_APP_DIR" ] && echo yes || echo no)"
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
