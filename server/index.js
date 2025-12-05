@@ -23,7 +23,7 @@ app.use(express.json());
 
 // MongoDB connection
 mongoose.connect(
-  process.env.MONGODB_URI || "mongodb://collisionalarm:A1b2c3d4e5vc@62.72.31.206:57423/collision-alarm?authSource=collision-alarm",
+  process.env.MONGODB_URI || "mongodb://localhost:27017/collision-alarm",
   {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -61,10 +61,10 @@ const activeConnections = new Map();
 const previousDistances = new Map();
 
 // Serve static files from the React frontend build
-app.use(express.static(path.join(__dirname, "server/build")));
+app.use(express.static(path.join(__dirname, "build")));
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "server/build"));
+  res.sendFile(path.join(__dirname, "build"));
 });
 
 // Socket connection handling
