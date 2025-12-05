@@ -60,10 +60,14 @@ jobs:
             PORT_OPT="-p $VPS_PORT"
           fi
 
+          echo "Preparing SSH for $VPS_USER@$VPS_HOST (port: ${VPS_PORT:-22})"
+
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          # ssh-keyscan may fail if firewall blocks it; don't fail the whole job for that
+          ssh-keyscan $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") -H "$VPS_HOST" >> ~/.ssh/known_hosts || \
+            echo "Warning: ssh-keyscan failed, continuing without pre-populated known_hosts"
 
           # Sync React build into server/build on the VPS (used by Express static)
           rsync -az --delete -e "ssh $PORT_OPT" client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/build/"
