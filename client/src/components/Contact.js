@@ -32,7 +32,7 @@ const Contact = ({ onBack }) => {
       const apiBaseUrl = process.env.REACT_APP_API_URL || 
                         (window.location.hostname === 'localhost' 
                           ? 'http://localhost:5000' 
-                          : 'https://vehiclecollisionapp.testatozas.in');
+                          : 'https://ucasaapp.testatozas.in/');
 
       const response = await fetch(`${apiBaseUrl}/api/contact`, {
         method: 'POST',
