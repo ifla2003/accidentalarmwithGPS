@@ -39,7 +39,8 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_PORT }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
         run: |
           set -e
@@ -54,12 +55,17 @@ jobs:
             exit 1
           fi
 
+          PORT_OPT=""
+          if [ -n "$VPS_PORT" ]; then
+            PORT_OPT="-p $VPS_PORT"
+          fi
+
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
           # Sync React build into server/build on the VPS (used by Express static)
-          rsync -az --delete client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/build/"
+          rsync -az --delete -e "ssh $PORT_OPT" client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/build/"
 
 
