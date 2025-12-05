@@ -10,7 +10,7 @@ import Feedback from "./components/Feedback";
 import "./App.css";
 
 // const socket = io("http://localhost:5000");
-const socket = io("https://vehiclecollisionapp.testatozas.in");
+const socket = io("https://ucasaapp.testatozas.in/");
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -90,7 +90,7 @@ function App() {
       const storedPhone = localStorage.getItem("userPhone");
       if (storedPhone) {
         try {
-          const response = await fetch(`https://vehiclecollisionapp.testatozas.in/api/user/${storedPhone}`);
+          const response = await fetch(`https://ucasaapp.testatozas.in/api/user/${storedPhone}`);
           if (response.ok) {
             const result = await response.json();
             if (result.success) {
