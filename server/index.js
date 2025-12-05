@@ -8,7 +8,6 @@ const nodemailer = require("nodemailer");
 require("dotenv").config();
 const path = require("path");
 
-
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {

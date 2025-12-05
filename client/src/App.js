@@ -9,6 +9,7 @@ import Contact from "./components/Contact";
 import Feedback from "./components/Feedback";
 import "./App.css";
 
+
 // const socket = io("http://localhost:5000");
 const socket = io("https://vehiclecollisionapp.testatozas.in");
 
