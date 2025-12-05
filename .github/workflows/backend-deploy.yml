@@ -1,0 +1,67 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "server/**"
+      - ".github/workflows/backend-deploy.yml"
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+          # Sync backend code to VPS (without node_modules)
+          rsync -az --delete \
+            --exclude "node_modules" \
+            server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/"
+
+      - name: Install dependencies and restart Node server
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" bash << 'EOF'
+          set -e
+          cd "$VPS_APP_DIR/server"
+
+          # Install/refresh production dependencies
+          if command -v npm >/dev/null 2>&1; then
+            npm ci --omit=dev
+          else
+            echo "npm is not installed on the VPS. Please install Node.js and npm."
+            exit 1
+          fi
+
+          # Restart the Node process with pm2 (recommended)
+          if command -v pm2 >/dev/null 2>&1; then
+            pm2 restart ucasaapp || pm2 start index.js --name ucasaapp
+            pm2 save
+          else
+            echo "pm2 is not installed. Starting Node directly (no process manager)."
+            # WARNING: this will die if the VPS reboots; install pm2 for production
+            # You can replace this with a systemd service if you prefer.
+            nohup node index.js >/dev/null 2>&1 &
+          fi
+          EOF
+
+
