@@ -65,8 +65,9 @@ jobs:
             PORT_OPT="-p $VPS_PORT"
           fi
 
-          ssh $PORT_OPT "$VPS_USER@$VPS_HOST" bash << 'EOF'
+          ssh $PORT_OPT "$VPS_USER@$VPS_HOST" bash << EOF
           set -e
+          echo "Using VPS_APP_DIR: $VPS_APP_DIR"
           cd "$VPS_APP_DIR/server"
 
           # Install/refresh production dependencies
