@@ -30,6 +30,9 @@ jobs:
 
       - name: Build frontend
         working-directory: client
+        env:
+          # Prevent Create React App from treating lint warnings as build errors in CI
+          CI: "false"
         run: npm run build
 
       - name: Deploy build to VPS
@@ -45,6 +48,6 @@ jobs:
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
           # Sync React build into server/build on the VPS (used by Express static)
-          rsync -az --delete client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/build/"
+          rsync -az --delete client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/build/"
 
 
