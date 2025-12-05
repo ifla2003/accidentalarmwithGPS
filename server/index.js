@@ -61,10 +61,10 @@ const activeConnections = new Map();
 const previousDistances = new Map();
 
 // Serve static files from the React frontend build
-app.use(express.static(path.join(__dirname, "server/build")));
+app.use(express.static(path.join(__dirname, "build")));
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "server/build"));
+  res.sendFile(path.join(__dirname, "build"));
 });
 
 // Socket connection handling
