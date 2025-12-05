@@ -156,12 +156,14 @@ const GPSSimulation = ({ vehicles, currentUser, onLocationUpdate }) => {
       vehicles.forEach((vehicle, index) => {
         let locationData;
         if (index === 0) {
-          // First vehicle stays at base location
+          // First vehicle stays at base location, facing North
           locationData = {
             phoneNumber: vehicle.phoneNumber,
             latitude: baseLocation.latitude,
             longitude: baseLocation.longitude,
             accuracy: 5,
+            heading: 0, // Facing North
+            isSimulated: true,
           };
         } else if (index === 1) {
           // Second vehicle exactly 6 meters away from first (within collision threshold)
@@ -180,6 +182,8 @@ const GPSSimulation = ({ vehicles, currentUser, onLocationUpdate }) => {
             latitude: baseLocation.latitude + latOffset,
             longitude: baseLocation.longitude + lonOffset,
             accuracy: 5,
+            heading: 180, // Facing South (opposite to first vehicle)
+            isSimulated: true,
           };
           
           console.log(`Base location: ${baseLocation.latitude}, ${baseLocation.longitude}`);
@@ -192,6 +196,8 @@ const GPSSimulation = ({ vehicles, currentUser, onLocationUpdate }) => {
             latitude: baseLocation.latitude + index * 0.0001,
             longitude: baseLocation.longitude + index * 0.0001,
             accuracy: 5,
+            heading: index * 90, // Different headings for variety
+            isSimulated: true,
           };
         }
         onLocationUpdate(locationData);
@@ -223,6 +229,8 @@ const GPSSimulation = ({ vehicles, currentUser, onLocationUpdate }) => {
             latitude: baseLocation.latitude,
             longitude: baseLocation.longitude,
             accuracy: 5,
+            heading: index === 0 ? 90 : 270, // First facing East, second facing West
+            isSimulated: true,
           };
         } else {
           // Other vehicles spread out from base location
@@ -231,6 +239,8 @@ const GPSSimulation = ({ vehicles, currentUser, onLocationUpdate }) => {
             latitude: baseLocation.latitude + index * 0.0001,
             longitude: baseLocation.longitude + index * 0.0001,
             accuracy: 5,
+            heading: index * 90,
+            isSimulated: true,
           };
         }
         onLocationUpdate(locationData);
@@ -270,6 +280,8 @@ const GPSSimulation = ({ vehicles, currentUser, onLocationUpdate }) => {
             ? baseLocation.longitude
             : baseLocation.longitude + (Math.random() - 0.5) * 0.01,
         accuracy: 5,
+        heading: Math.floor(Math.random() * 360), // Random heading 0-359 degrees
+        isSimulated: true,
       };
       onLocationUpdate(locationData);
     });

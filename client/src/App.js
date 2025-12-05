@@ -3,9 +3,13 @@ import io from "socket.io-client";
 import CollisionAlert from "./components/CollisionAlert";
 import Dashboard from "./components/Dashboard";
 import MapDemo from "./components/MapDemo";
+import LandingPage from "./components/LandingPage";
+import AboutLegal from "./components/AboutLegal";
+import Contact from "./components/Contact";
+import Feedback from "./components/Feedback";
 import "./App.css";
 
-//const socket = io("http://localhost:5000");
+// const socket = io("http://localhost:5000");
 const socket = io("https://vehiclecollisionapp.testatozas.in");
 
 function App() {
@@ -14,6 +18,7 @@ function App() {
   const [collisionAlert, setCollisionAlert] = useState(null);
   const [demoMode, setDemoMode] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showLandingPage, setShowLandingPage] = useState(true);
   const [gpsStatus, setGpsStatus] = useState("inactive"); // inactive, searching, active, error
   const [systemStatus, setSystemStatus] = useState({
     monitoring: "Active",
@@ -22,6 +27,10 @@ function App() {
     warningThreshold: 5,
     maxRange: "0.6km / 5km max range",
   });
+  const [showAboutLegal, setShowAboutLegal] = useState(false);
+  const [aboutLegalView, setAboutLegalView] = useState(null);
+  const [showContact, setShowContact] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Separate useEffect for socket setup
   useEffect(() => {
@@ -86,19 +95,26 @@ function App() {
             const result = await response.json();
             if (result.success) {
               setCurrentUser(result.user);
+              setShowLandingPage(false);
               // Auto-register the user as a vehicle (but don't wait for response)
               handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
                 .catch(error => console.error("Auto-registration failed:", error));
+            } else {
+              setShowLandingPage(true);
             }
           } else {
             // User not found in database, clear local storage
             localStorage.removeItem("userPhone");
+            setShowLandingPage(true);
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
           // Clear local storage on error
           localStorage.removeItem("userPhone");
+          setShowLandingPage(true);
         }
+      } else {
+        setShowLandingPage(true);
       }
     };
 
@@ -440,6 +456,9 @@ function App() {
 
   const handleUpdateUser = (userData) => {
     setCurrentUser(userData);
+    if (userData) {
+      setShowLandingPage(false);
+    }
   };
 
   const stopGPSTracking = () => {
@@ -516,6 +535,61 @@ function App() {
     setCollisionAlert(null);
   };
 
+  const handleGetStarted = () => {
+    setShowLandingPage(false);
+  };
+
+  const handleBackToLanding = () => {
+    setShowLandingPage(true);
+  };
+
+  const handleShowAboutLegalWithView = (view) => {
+    setAboutLegalView(view);
+    setShowAboutLegal(true);
+  };
+
+  const handleCloseAboutLegal = () => {
+    setShowAboutLegal(false);
+    setAboutLegalView(null);
+  };
+
+  // Show contact page
+  if (showContact) {
+    return (
+      <div className="App">
+        <Contact onBack={() => setShowContact(false)} />
+      </div>
+    );
+  }
+
+  // Show feedback page
+  if (showFeedback) {
+    return (
+      <div className="App">
+        <Feedback onBack={() => setShowFeedback(false)} />
+      </div>
+    );
+  }
+
+  // Show landing page if no user and landing page should be shown
+  if (showLandingPage && !currentUser) {
+    return (
+      <div className="App">
+        <LandingPage 
+          onGetStarted={handleGetStarted} 
+          onShowAboutLegal={() => setShowAboutLegal(true)} 
+          onShowAboutLegalWithView={handleShowAboutLegalWithView}
+          onShowContact={() => setShowContact(true)}
+          onShowFeedback={() => setShowFeedback(true)}
+        />
+        <AboutLegal
+          open={showAboutLegal}
+          onClose={handleCloseAboutLegal}
+          initialView={aboutLegalView}
+        />
+      </div>
+    );
+  }
 
   if (demoMode) {
     return (
@@ -552,9 +626,18 @@ function App() {
       <header className="App-header">
         <div className="header-content">
           <div className="header-main">
-            <span className="header-icon">🚗</span>
+            {!currentUser && (
+              <button 
+                className="back-btn"
+                onClick={handleBackToLanding}
+                title="Back to Landing Page"
+              >
+                ← Back
+              </button>
+            )}
+            {/* <span className="header-icon">UcasaApp</span> */}
             <div>
-              <h1>Vehicle Collision Warning System</h1>
+              <h1>Universal Collision Avoidance System Advisory App</h1>
               <p>GPS-based proximity alarm for accident prevention</p>
             </div>
           </div>
@@ -587,6 +670,13 @@ function App() {
                   </button>
                 </>
               ) : null} */}
+              {/* <button
+                type="button"
+                className="about-btn"
+                onClick={() => setShowAboutLegal(true)}
+              >
+                About / Legal
+              </button> */}
             </div>
           </div>
         </div>
@@ -613,6 +703,12 @@ function App() {
         {collisionAlert && (
           <CollisionAlert alert={collisionAlert} onDismiss={dismissAlert} />
         )}
+
+        <AboutLegal
+          open={showAboutLegal}
+          onClose={handleCloseAboutLegal}
+          initialView={aboutLegalView}
+        />
       </main>
     </div>
   );

@@ -2,6 +2,7 @@
   "name": "collision-alarm-server",
   "version": "1.0.0",
   "main": "index.js",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js"
@@ -13,6 +14,7 @@
     "express": "^4.18.2",
     "geolib": "^3.3.4",
     "mongoose": "^8.0.3",
+    "nodemailer": "^7.0.11",
     "socket.io": "^4.7.4"
   },
   "devDependencies": {

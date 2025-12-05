@@ -309,6 +309,59 @@ n-text {
   opacity: 0.95;
 }
 
+.relative-direction {
+  display: inline-block;
+}
+
+.relative-direction strong {
+  color: #000;
+  font-size: 1em;
+}
+
+.compass-direction-small {
+  font-size: 0.8em;
+  opacity: 0.7;
+  font-weight: normal;
+  font-style: italic;
+}
+
+.vehicle-movement {
+  font-size: 0.85em;
+  font-weight: bold;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.vehicle-movement.approaching {
+  background-color: rgba(255, 0, 0, 0.25);
+  color: #cc0000;
+  border: 1px solid #ff0000;
+  animation: pulse-movement 1s infinite;
+}
+
+.vehicle-movement.receding {
+  background-color: rgba(0, 200, 0, 0.25);
+  color: #006600;
+  border: 1px solid #00aa00;
+}
+
+@keyframes pulse-movement {
+  0%, 100% { 
+    background-color: rgba(255, 0, 0, 0.25);
+  }
+  50% { 
+    background-color: rgba(255, 0, 0, 0.4);
+  }
+}
+
+.movement-speed {
+  font-size: 0.9em;
+  opacity: 0.8;
+  font-weight: normal;
+}
+
 /* Mobile responsive for vehicle lists */
 @media (max-width: 768px) {
   .vehicle-list {

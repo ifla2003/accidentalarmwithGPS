@@ -34,10 +34,10 @@ const CollisionAlert = ({ alert, onDismiss }) => {
       if (isCombinedAlert) {
         if (collisionVehicles.length > 0) {
           const directions = collisionVehicles.map(v => v.direction?.name).filter(Boolean).join(', ');
-          message = `Collision alert! ${collisionVehicles.length} vehicle${collisionVehicles.length > 1 ? 's' : ''} within 3 meters${directions ? ` from ${directions} direction` : ''}! Take immediate action!`;
+          message = `Collision alert! ${collisionVehicles.length} vehicle${collisionVehicles.length > 1 ? 's' : ''} ${directions ? `at ${directions}` : 'nearby'}! Take immediate action!`;
         } else if (warningVehicles.length > 0) {
           const directions = warningVehicles.map(v => v.direction?.name).filter(Boolean).join(', ');
-          message = `Warning! ${warningVehicles.length} vehicle${warningVehicles.length > 1 ? 's' : ''} within 5 meters${directions ? ` from ${directions} direction` : ''}. Please maintain safe distance.`;
+          message = `Warning! ${warningVehicles.length} vehicle${warningVehicles.length > 1 ? 's' : ''} ${directions ? `at ${directions}` : 'nearby'}. Please maintain safe distance.`;
         }
       } else {
         // Legacy single vehicle alerts
@@ -206,11 +206,21 @@ const CollisionAlert = ({ alert, onDismiss }) => {
                           </div>
                           <div className="vehicle-direction">
                             {vehicle.direction && (
-                              <span>
-                                {vehicle.direction.emoji} {vehicle.direction.name} direction
+                              <span className="relative-direction">
+                                {vehicle.direction.emoji} <strong>{vehicle.direction.name}</strong>
                               </span>
                             )}
                           </div>
+                          {vehicle.movement && vehicle.movement.status !== "unknown" && (
+                            <div className={`vehicle-movement ${vehicle.movement.status}`}>
+                              {vehicle.movement.emoji} <strong>{vehicle.movement.text}</strong>
+                              {vehicle.movement.speed > 0 && (
+                                <span className="movement-speed">
+                                  {' '}({vehicle.movement.speed.toFixed(1)} m/s)
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -234,11 +244,21 @@ const CollisionAlert = ({ alert, onDismiss }) => {
                           </div>
                           <div className="vehicle-direction">
                             {vehicle.direction && (
-                              <span>
-                                {vehicle.direction.emoji} {vehicle.direction.name} direction
+                              <span className="relative-direction">
+                                {vehicle.direction.emoji} <strong>{vehicle.direction.name}</strong>
                               </span>
                             )}
                           </div>
+                          {vehicle.movement && vehicle.movement.status !== "unknown" && (
+                            <div className={`vehicle-movement ${vehicle.movement.status}`}>
+                              {vehicle.movement.emoji} <strong>{vehicle.movement.text}</strong>
+                              {vehicle.movement.speed > 0 && (
+                                <span className="movement-speed">
+                                  {' '}({vehicle.movement.speed.toFixed(1)} m/s)
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

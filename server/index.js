@@ -1,9 +1,10 @@
-const express = require("express");
+                    const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const { getDistance, getRhumbLineBearing } = require("geolib");
+const nodemailer = require("nodemailer");
 require("dotenv").config();
 const path = require("path");
 
@@ -55,6 +56,10 @@ const Vehicle = mongoose.model("Vehicle", vehicleSchema);
 // Store active connections
 const activeConnections = new Map();
 
+// Store previous distance data for tracking approaching/receding vehicles
+// Key format: "phoneNumber1-phoneNumber2" (sorted alphabetically)
+const previousDistances = new Map();
+
 // Serve static files from the React frontend build
 app.use(express.static(path.join(__dirname, "build")));
 
@@ -64,7 +69,7 @@ app.get("*", (req, res) => {
 
 // Socket connection handling
 io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+  //console.log("Client connected:", socket.id);
 
   socket.on("register-vehicle", async (data) => {
     const { phoneNumber, vehicleId, fullName, vehicleType } = data;
@@ -225,7 +230,7 @@ io.on("connection", (socket) => {
         "currentLocation.longitude": { $exists: true, $ne: null },
       }).sort({ "currentLocation.timestamp": -1 });
 
-      console.log(`Fetched ${allUsers.length} users with location data`);
+      //console.log(`Fetched ${allUsers.length} users with location data`);
       socket.emit("all-users-update", allUsers);
     } catch (error) {
       console.error("Get all users error:", error);
@@ -307,26 +312,99 @@ io.on("connection", (socket) => {
   });
 });
 
-// Function to convert bearing to direction
-function getDirectionFromBearing(bearing) {
-  const directions = [
-    { name: "North", emoji: "⬆️", range: [0, 22.5] },
-    { name: "Northeast", emoji: "↗️", range: [22.5, 67.5] },
-    { name: "East", emoji: "➡️", range: [67.5, 112.5] },
-    { name: "Southeast", emoji: "↘️", range: [112.5, 157.5] },
-    { name: "South", emoji: "⬇️", range: [157.5, 202.5] },
-    { name: "Southwest", emoji: "↙️", range: [202.5, 247.5] },
-    { name: "West", emoji: "⬅️", range: [247.5, 292.5] },
-    { name: "Northwest", emoji: "↖️", range: [292.5, 337.5] },
-    { name: "North", emoji: "⬆️", range: [337.5, 360] }
-  ];
-
-  for (const direction of directions) {
-    if (bearing >= direction.range[0] && bearing < direction.range[1]) {
-      return direction;
-    }
+// Function to get movement status (approaching/receding)
+function getMovementStatus(currentDistance, vehiclePairKey) {
+  const now = Date.now();
+  const previousData = previousDistances.get(vehiclePairKey);
+  
+  if (!previousData) {
+    // First time seeing this pair, store current distance
+    previousDistances.set(vehiclePairKey, {
+      distance: currentDistance,
+      timestamp: now
+    });
+    return { status: "unknown", speed: 0 };
   }
-  return directions[0]; // Default to North
+  
+  const timeDiff = (now - previousData.timestamp) / 1000; // Convert to seconds
+  
+  // Only calculate if we have at least 1 second difference
+  if (timeDiff < 1) {
+    return { status: "unknown", speed: 0 };
+  }
+  
+  const distanceDiff = currentDistance - previousData.distance;
+  const speed = Math.abs(distanceDiff / timeDiff); // meters per second
+  
+  // Update stored distance
+  previousDistances.set(vehiclePairKey, {
+    distance: currentDistance,
+    timestamp: now
+  });
+  
+  // Determine status based on distance change
+  if (distanceDiff < -0.3) { // Getting closer (threshold: 0.3m change)
+    return { 
+      status: "approaching", 
+      speed: speed,
+      emoji: "🔴",
+      text: "Coming Closer"
+    };
+  } else if (distanceDiff > 0.3) { // Going away
+    return { 
+      status: "receding", 
+      speed: speed,
+      emoji: "🟢",
+      text: "Going Away"
+    };
+  } else { // No significant change - don't show status
+    return { 
+      status: "unknown", 
+      speed: 0
+    };
+  }
+}
+
+// Function to get relative direction based on vehicle's heading
+function getRelativeDirection(vehicleHeading, bearingToTarget) {
+  // If vehicle heading is not available, use a default nearby indicator
+  if (vehicleHeading === null || vehicleHeading === undefined) {
+    return { name: "Nearby", emoji: "📍", angle: null };
+  }
+
+  // Calculate relative angle (difference between where vehicle is facing and where target is)
+  let relativeAngle = bearingToTarget - vehicleHeading;
+  
+  // Normalize to -180 to 180 range
+  while (relativeAngle > 180) relativeAngle -= 360;
+  while (relativeAngle < -180) relativeAngle += 360;
+
+  // Determine relative position based on angle
+  // Front: -30° to 30°
+  // Right: 60° to 120°
+  // Back: 150° to 180° or -150° to -180°
+  // Left: -60° to -120°
+  
+  const absAngle = Math.abs(relativeAngle);
+  
+  if (absAngle <= 30) {
+    return { name: "Front", emoji: "⬆️", angle: relativeAngle };
+  } else if (relativeAngle > 30 && relativeAngle <= 60) {
+    return { name: "Front-Right", emoji: "↗️", angle: relativeAngle };
+  } else if (relativeAngle > 60 && relativeAngle <= 120) {
+    return { name: "Right", emoji: "➡️", angle: relativeAngle };
+  } else if (relativeAngle > 120 && relativeAngle <= 150) {
+    return { name: "Back-Right", emoji: "↘️", angle: relativeAngle };
+  } else if (relativeAngle < -30 && relativeAngle >= -60) {
+    return { name: "Front-Left", emoji: "↖️", angle: relativeAngle };
+  } else if (relativeAngle < -60 && relativeAngle >= -120) {
+    return { name: "Left", emoji: "⬅️", angle: relativeAngle };
+  } else if (relativeAngle < -120 && relativeAngle >= -150) {
+    return { name: "Back-Left", emoji: "↙️", angle: relativeAngle };
+  } else {
+    // Back (150° to 180° or -150° to -180°)
+    return { name: "Back", emoji: "⬇️", angle: relativeAngle };
+  }
 }
 
 // Collision detection function
@@ -420,7 +498,19 @@ async function checkCollisionRisk(currentVehicle, io) {
           }
         );
         
-        const direction = getDirectionFromBearing(bearing);
+        // Get relative direction based on current vehicle's heading
+        const direction = getRelativeDirection(
+          currentVehicle.currentLocation.heading,
+          bearing
+        );
+
+        // Create a unique key for this vehicle pair (sorted for consistency)
+        const vehiclePairKey = [currentVehicle.phoneNumber, otherVehicle.phoneNumber]
+          .sort()
+          .join('-');
+        
+        // Get movement status (approaching/receding)
+        const movement = getMovementStatus(distance, vehiclePairKey);
 
         // Check if distance is within collision threshold (3m)
         if (distance <= COLLISION_DISTANCE) {
@@ -432,11 +522,12 @@ async function checkCollisionRisk(currentVehicle, io) {
             distance: distance,
             direction: direction,
             bearing: bearing,
+            movement: movement,
             location: otherVehicle.currentLocation,
           });
 
           console.log(
-            `🚨 COLLISION RISK: ${distance}m - ${otherVehicle.vehicleId} ${direction.emoji} ${direction.name} of ${currentVehicle.vehicleId}`
+            `🚨 COLLISION RISK: ${distance}m - ${otherVehicle.vehicleId} ${direction.emoji} ${direction.name} of ${currentVehicle.vehicleId} - ${movement.emoji} ${movement.text}`
           );
         }
         // Check if distance is within warning threshold (5m) but not collision
@@ -449,11 +540,12 @@ async function checkCollisionRisk(currentVehicle, io) {
             distance: distance,
             direction: direction,
             bearing: bearing,
+            movement: movement,
             location: otherVehicle.currentLocation,
           });
 
           console.log(
-            `⚠️ WARNING: ${distance}m - ${otherVehicle.vehicleId} ${direction.emoji} ${direction.name} of ${currentVehicle.vehicleId}`
+            `⚠️ WARNING: ${distance}m - ${otherVehicle.vehicleId} ${direction.emoji} ${direction.name} of ${currentVehicle.vehicleId} - ${movement.emoji} ${movement.text}`
           );
         }
       }
@@ -550,6 +642,128 @@ app.post("/api/vehicles", async (req, res) => {
   }
 });
 
+// Nodemailer transporter configuration
+const transporter = nodemailer.createTransport({
+  name: process.env.SMTP_NAME,
+  host: process.env.SMTP_SERVER,
+  port: parseInt(process.env.SMTP_PORT),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_EMAIL,
+    pass: process.env.SMTP_EMAIL_PASSWORD,
+  },
+  tls: {
+    rejectUnauthorized: false, // Bypass hostname mismatch
+  },
+});
+
+// Feedback endpoint
+app.post("/api/feedback", async (req, res) => {
+  try {
+    const { name, email, feedbackType, rating, message } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !feedbackType || !message) {
+      return res.status(400).json({ error: "All required fields must be filled" });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Prepare email content
+    const emailSubject = `UCASA Feedback - ${feedbackType}`;
+    const emailBody = `
+      <h2>New Feedback Received</h2>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Feedback Type:</strong> ${feedbackType}</p>
+      <p><strong>Rating:</strong> ${rating || "Not provided"}</p>
+      <hr>
+      <h3>Message:</h3>
+      <p>${message.replace(/\n/g, "<br>")}</p>
+      <hr>
+      <p><em>Submitted at: ${new Date().toLocaleString()}</em></p>
+    `;
+
+    // Send email
+    const mailOptions = {
+      from: process.env.SMTP_EMAIL,
+      to: "ucasa@testatozas.in",
+      subject: emailSubject,
+      html: emailBody,
+      replyTo: email,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Feedback submitted successfully" 
+    });
+  } catch (error) {
+    console.error("Error sending feedback email:", error);
+    res.status(500).json({ 
+      error: "Failed to submit feedback. Please try again later." 
+    });
+  }
+});
+
+// Contact endpoint
+app.post("/api/contact", async (req, res) => {
+  try {
+    const { name, email, phone, subject, message } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: "All required fields must be filled" });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Prepare email content
+    const emailSubject = `UCASA Contact - ${subject}`;
+    const emailBody = `
+      <h2>New Contact Message Received</h2>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
+      <p><strong>Subject:</strong> ${subject}</p>
+      <hr>
+      <h3>Message:</h3>
+      <p>${message.replace(/\n/g, "<br>")}</p>
+      <hr>
+      <p><em>Submitted at: ${new Date().toLocaleString()}</em></p>
+    `;
+
+    // Send email
+    const mailOptions = {
+      from: process.env.SMTP_EMAIL,
+      to: "ucasa@testatozas.in",
+      subject: emailSubject,
+      html: emailBody,
+      replyTo: email,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Message sent successfully" 
+    });
+  } catch (error) {
+    console.error("Error sending contact email:", error);
+    res.status(500).json({ 
+      error: "Failed to send message. Please try again later." 
+    });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
